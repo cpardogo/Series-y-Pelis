@@ -2,23 +2,38 @@ name: Update Radar
 
 on:
   workflow_dispatch: {}
+  schedule:
+    - cron: "0 9 * * 1"  # Lunes 09:00 UTC (ajusta si quieres)
 
 jobs:
   update:
     runs-on: ubuntu-latest
+
     permissions:
       contents: write
-    steps:
-      - uses: actions/checkout@v4
 
-      - name: Proof of update
-        run: |
-          echo "Última actualización: $(date -u +'%Y-%m-%d %H:%M UTC')" > last_update.txt
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build latest data
+        env:
+          TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+          OMDB_API_KEY: ${{ secrets.OMDB_API_KEY }}
+        run: npm run build
 
       - name: Commit & push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add -A
-          git diff --cached --quiet || git commit -m "Update ($(date -u +'%Y-%m-%d'))"
+          git diff --cached --quiet || git commit -m "Update radar ($(date -u +'%Y-%m-%d'))"
           git push
