@@ -1,5 +1,21 @@
 {
   "updatedAt": "2026-02-23",
+  "movies": [
+    { "rank": 1, "title": "Ejemplo película 1", "imdb": 7.9, "where": "Cine" },
+    { "rank": 2, "title": "Ejemplo película 2", "imdb": 7.6, "where": "Netflix" },
+    { "rank": 3, "title": "Ejemplo película 3", "imdb": 7.4, "where": "Prime Video" },
+    { "rank": 4, "title": "Ejemplo película 4", "imdb": 7.2, "where": "Disney+" },
+    { "rank": 5, "title": "Ejemplo película 5", "imdb": 7.1, "where": "Movistar+" }
+  ],
+  "series": [
+    { "rank": 1, "title": "Ejemplo serie 1", "imdb": 8.3, "where": "Netflix" },
+    { "rank": 2, "title": "Ejemplo serie 2", "imdb": 8.0, "where": "HBO Max" },
+    { "rank": 3, "title": "Ejemplo serie 3", "imdb": 7.9, "where": "Prime Video" },
+    { "rank": 4, "title": "Ejemplo serie 4", "imdb": 7.7, "where": "Disney+" },
+    { "rank": 5, "title": "Ejemplo serie 5", "imdb": 7.6, "where": "Apple TV+" }
+  ]
+}{
+  "updatedAt": "2026-02-23",
   "movies": [],
   "series": []
 }
