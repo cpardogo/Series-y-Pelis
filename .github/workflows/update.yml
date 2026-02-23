@@ -1,1 +1,31 @@
+name: Update Radar
 
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 9 * * 1"   # Lunes 09:00 Europe/Madrid (aprox; GitHub usa UTC)
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install
+        run: npm ci
+
+      - name: Build reports
+        run: npm run build
+
+      - name: Commit & push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Update reports ($(date -u +'%Y-%m-%d'))"
+          git push
