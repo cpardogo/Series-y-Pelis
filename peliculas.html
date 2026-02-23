@@ -1,152 +1,26 @@
-<!doctype html>
-<html lang="es">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Películas · Demo enero</title>
-  <style>
-    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;margin:18px;line-height:1.25}
-    h1{margin:0 0 6px}
-    .muted{color:#666}
-    .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:12px 0 10px}
-    input,select{padding:8px 10px;border:1px solid #ccc;border-radius:8px}
-    table{border-collapse:collapse;width:100%;font-size:13px}
-    th,td{border:1px solid #ddd;padding:8px;vertical-align:top}
-    th{background:#111;color:#fff;position:sticky;top:0}
-    tr:nth-child(even){background:#f6f6f6}
-    .pill{display:inline-block;padding:2px 8px;border-radius:999px;background:#eee;font-size:12px}
-    .right{text-align:right}
-    .center{text-align:center}
-    .small{font-size:12px}
-    .up{color:#0a7a0a;font-weight:600}
-    .down{color:#b00020;font-weight:600}
-    .new{color:#0b57d0;font-weight:600}
-    .wrap{white-space:normal}
-    .note{background:#fff7e6;border:1px solid #ffd18a;padding:10px;border-radius:10px;margin:12px 0}
-    .tag{display:inline-block;padding:2px 8px;border-radius:999px;background:#eef3ff;font-size:12px}
-  </style>
-</head>
-<body>
-  <h1>🎬 Películas · Demo (enero 2026)</h1>
-  <div class="note small">
-    <b>IMPORTANTE:</b> esto es una <b>demo</b> con datos ficticios para probar la evolución semana a semana (ranking, Δ vs semana anterior, histórico).
-    No son cifras reales.
-  </div>
-  <div class="muted small">
-    Publicación: mínimo <b>FilmAffinity + IMDb</b>. RT/Metacritic opcional. <br/>
-    Nota Final: pesos ideales FA 25%, IMDb 25%, RTc 12.5%, RTa 12.5%, MCm 12.5%, MCu 12.5%,
-    <b>normalizados</b> si faltan fuentes.
-  </div>
-
-  <div class="controls">
-    <label class="small">Semana:
-      <select id="weekSelect"></select>
-    </label>
-    <input id="q" placeholder="Buscar película..." />
-    <span class="pill" id="lastUpdated"></span>
-  </div>
-
-  <table id="tbl">
-    <thead>
-      <tr>
-        <th>#</th>
-        <th>Película</th>
-        <th>Estreno ES</th>
-        <th>Tipo de estreno</th>
-        <th>País</th>
-        <th>Idioma</th>
-        <th>Género</th>
-        <th class="center">Cines</th>
-        <th class="center">Netflix</th>
-        <th class="center">Prime</th>
-        <th class="center">Disney+</th>
-        <th class="center">Movistar+</th>
-        <th class="right">FA</th>
-        <th class="right">IMDb</th>
-        <th class="right">RT (C/A)</th>
-        <th class="right">MC (M/U)</th>
-        <th class="center">Cobertura</th>
-        <th class="right">Final</th>
-        <th class="center">Δ vs prev</th>
-      </tr>
-    </thead>
-    <tbody></tbody>
-  </table>
-
 <script>
 /**
- * DATA: añade cada semana un objeto con:
- * {
- *   week: "YYYY-MM-DD",
- *   items: [ { id, title, release_es, release_type, country, language, genre,
- *              availability:{cines, netflix, prime, disney, movistar},
- *              ratings:{ fa, imdb, rt_crit, rt_aud, mc_meta, mc_user } } ]
- * }
- * Escalas:
- * - fa/imdb/mc_user en 0-10
- * - rt_crit/rt_aud/mc_meta en 0-100 (se convierten a /10 en cálculo)
+ * MODO REAL (histórico semanal)
+ * Lee:
+ *  - ./data/movies/index.json        -> { "weeks": ["YYYY-MM-DD", ...] } (orden desc recomendado)
+ *  - ./data/movies/weeks/<week>.json -> { "week":"YYYY-MM-DD", "items":[...], ... }
+ *
+ * Nota: tus items reales NO tienen por qué venir con la estructura demo.
+ * Este adaptador intenta mapear lo que generamos en el pipeline a la estructura que tu tabla espera.
  */
-const DATA = [
-  {
-    week: "2026-01-26",
-    items: [
-      {id:"m-a", title:"Película A", release_es:"2026-01-16", release_type:"Cines",
-       country:"EE. UU.", language:"Inglés", genre:"Acción / Thriller",
-       availability:{cines:true, netflix:false, prime:false, disney:false, movistar:false},
-       ratings:{fa:7.3, imdb:7.5, rt_crit:92, rt_aud:87, mc_meta:80, mc_user:7.6}},
-      {id:"m-b", title:"Película B", release_es:"2026-01-17", release_type:"Netflix",
-       country:"España", language:"Español", genre:"Drama / Crimen",
-       availability:{cines:false, netflix:true, prime:false, disney:false, movistar:false},
-       ratings:{fa:6.6, imdb:6.9, rt_crit:null, rt_aud:null, mc_meta:null, mc_user:null}},
-      {id:"m-c", title:"Película C", release_es:"2026-01-18", release_type:"Prime Video",
-       country:"Francia", language:"Francés", genre:"Comedia",
-       availability:{cines:false, netflix:false, prime:true, disney:false, movistar:false},
-       ratings:{fa:6.1, imdb:6.2, rt_crit:64, rt_aud:60, mc_meta:null, mc_user:null}}
-    ]
-  },
-  {
-    week: "2026-01-19",
-    items: [
-      {id:"m-a", title:"Película A", release_es:"2026-01-16", release_type:"Cines",
-       country:"EE. UU.", language:"Inglés", genre:"Acción / Thriller",
-       availability:{cines:true, netflix:false, prime:false, disney:false, movistar:false},
-       ratings:{fa:7.2, imdb:7.4, rt_crit:91, rt_aud:86, mc_meta:79, mc_user:7.5}},
-      {id:"m-d", title:"Película D", release_es:"2026-01-14", release_type:"Disney+",
-       country:"Japón", language:"Japonés", genre:"Animación / Aventuras",
-       availability:{cines:false, netflix:false, prime:false, disney:true, movistar:false},
-       ratings:{fa:6.8, imdb:7.0, rt_crit:85, rt_aud:90, mc_meta:74, mc_user:7.8}},
-      {id:"m-b", title:"Película B", release_es:"2026-01-17", release_type:"Netflix",
-       country:"España", language:"Español", genre:"Drama / Crimen",
-       availability:{cines:false, netflix:true, prime:false, disney:false, movistar:false},
-       ratings:{fa:6.5, imdb:6.8, rt_crit:null, rt_aud:null, mc_meta:null, mc_user:null}}
-    ]
-  },
-  {
-    week: "2026-01-12",
-    items: [
-      {id:"m-d", title:"Película D", release_es:"2026-01-14", release_type:"Disney+",
-       country:"Japón", language:"Japonés", genre:"Animación / Aventuras",
-       availability:{cines:false, netflix:false, prime:false, disney:true, movistar:false},
-       ratings:{fa:6.7, imdb:6.9, rt_crit:84, rt_aud:89, mc_meta:73, mc_user:7.7}},
-      {id:"m-a", title:"Película A", release_es:"2026-01-16", release_type:"Cines",
-       country:"EE. UU.", language:"Inglés", genre:"Acción / Thriller",
-       availability:{cines:true, netflix:false, prime:false, disney:false, movistar:false},
-       ratings:{fa:7.1, imdb:7.3, rt_crit:90, rt_aud:85, mc_meta:78, mc_user:7.4}}
-    ]
-  }
-];
 
 const IDEAL_WEIGHTS = { fa:0.25, imdb:0.25, rt_crit:0.125, rt_aud:0.125, mc_meta:0.125, mc_user:0.125 };
 
 function to10_rt(x){ return (typeof x==="number") ? (x/10) : null; }
 function to10_mcmeta(x){ return (typeof x==="number") ? (x/10) : null; }
 
+// ✅ Cambio clave: permitimos calcular Final con las fuentes disponibles (al menos IMDb o FA)
 function computeFinal(r){
-  if(typeof r.fa!=="number" || typeof r.imdb!=="number") return null;
+  if(!r || (typeof r.fa!=="number" && typeof r.imdb!=="number")) return null;
 
   const mapped = {
-    fa: r.fa,
-    imdb: r.imdb,
+    fa: (typeof r.fa==="number") ? r.fa : null,
+    imdb: (typeof r.imdb==="number") ? r.imdb : null,
     rt_crit: to10_rt(r.rt_crit),
     rt_aud: to10_rt(r.rt_aud),
     mc_meta: to10_mcmeta(r.mc_meta),
@@ -162,6 +36,8 @@ function computeFinal(r){
     }
   }
 
+  if(wsum === 0) return null;
+
   let total = 0;
   for(const k of available){
     total += (IDEAL_WEIGHTS[k]/wsum) * mapped[k];
@@ -172,38 +48,124 @@ function computeFinal(r){
 function coverage(r){
   const fields = ["fa","imdb","rt_crit","rt_aud","mc_meta","mc_user"];
   let have = 0;
-  for(const f of fields){ if(typeof r[f] === "number") have++; }
+  for(const f of fields){ if(r && typeof r[f] === "number") have++; }
   return `${have}/6`;
 }
 
 function boolToYes(b){ return b ? "Sí" : "No"; }
 
-function setWeekOptions(){
+// ---------- CARGA REAL ----------
+let WEEKS = [];                 // ["YYYY-MM-DD", ...] desc
+let WEEK_CACHE = new Map();     // week -> items adaptados
+let currentIdx = 0;
+
+async function fetchJSON(url){
+  const r = await fetch(url + (url.includes("?") ? "&" : "?") + "ts=" + Date.now(), { cache:"no-store" });
+  if(!r.ok) throw new Error(`No puedo cargar ${url} (HTTP ${r.status})`);
+  return r.json();
+}
+
+function slugId(title){
+  return (title || "")
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
+    .replace(/[^a-z0-9]+/g,"-")
+    .replace(/(^-|-$)/g,"")
+    .slice(0,60) || ("id-" + Math.random().toString(16).slice(2));
+}
+
+// Adaptador: convierte item REAL -> estructura DEMO que tu tabla espera
+function adaptItem(real){
+  // Si ya viene en formato demo, lo devolvemos tal cual
+  if(real && real.ratings && real.availability && real.release_es) return real;
+
+  const title = real.title || real.name || "Sin título";
+  const id = real.id || real.imdbId || slugId(title);
+
+  // Soportar nombres en español (los que generamos en el script)
+  const release_es = real.release_es || real.estreno_es || real.releaseDate || null;
+  const release_type = real.release_type || real.tipo_estreno || real.where || "N/D";
+
+  const availability = real.availability || {
+    cines: String(real.cines || "").toLowerCase() === "sí" || real.cines === true,
+    netflix: String(real.netflix || "").toLowerCase() === "sí" || real.netflix === true,
+    prime: String(real.prime || "").toLowerCase() === "sí" || real.prime === true,
+    disney: String(real.disney || "").toLowerCase() === "sí" || real.disney === true,
+    movistar: String(real.movistar || "").toLowerCase() === "sí" || real.movistar === true
+  };
+
+  const ratings = real.ratings || {
+    fa: (typeof real.fa === "number") ? real.fa : null,
+    imdb: (typeof real.imdb === "number") ? real.imdb : null,
+    rt_crit: (typeof real.rt_c === "number") ? real.rt_c : (typeof real.rt_crit === "number" ? real.rt_crit : null),
+    rt_aud:  (typeof real.rt_a === "number") ? real.rt_a : (typeof real.rt_aud === "number" ? real.rt_aud : null),
+    mc_meta: (typeof real.mc_m === "number") ? real.mc_m : (typeof real.mc_meta === "number" ? real.mc_meta : null),
+    mc_user: (typeof real.mc_u === "number") ? real.mc_u : (typeof real.mc_user === "number" ? real.mc_user : null),
+  };
+
+  return {
+    id,
+    title,
+    release_es,
+    release_type,
+    country: real.country || real.pais || "N/D",
+    language: real.language || real.idioma || "N/D",
+    genre: real.genre || real.genero || "N/D",
+    availability,
+    ratings
+  };
+}
+
+async function loadWeeksIndex(){
+  const idx = await fetchJSON("./data/movies/index.json");
+  const weeks = idx.weeks || [];
+  if(!Array.isArray(weeks) || weeks.length === 0) throw new Error("index.json no tiene semanas");
+  WEEKS = weeks; // se asume desc
+}
+
+async function loadWeekItems(week){
+  if(WEEK_CACHE.has(week)) return WEEK_CACHE.get(week);
+  const wk = await fetchJSON(`./data/movies/weeks/${week}.json`);
+  const items = (wk.items || []).map(adaptItem);
+  WEEK_CACHE.set(week, items);
+  return items;
+}
+
+async function setWeekOptionsReal(){
   const sel = document.getElementById("weekSelect");
   sel.innerHTML = "";
-  DATA.forEach((w, idx) => {
+  WEEKS.forEach((w, idx) => {
     const opt = document.createElement("option");
-    opt.value = idx;
-    opt.textContent = w.week;
+    opt.value = String(idx);
+    opt.textContent = w;
     sel.appendChild(opt);
   });
   sel.value = "0";
+  currentIdx = 0;
 }
 
-function render(){
+// ---------- RENDER ----------
+async function render(){
   const idx = parseInt(document.getElementById("weekSelect").value || "0", 10);
-  const current = DATA[idx];
-  const prev = DATA[idx+1]?.items || [];
-  const prevMap = new Map(prev.map(x => [x.id, computeFinal(x.ratings)]));
+  currentIdx = idx;
 
-  document.getElementById("lastUpdated").textContent = `Semana: ${current.week}`;
+  const week = WEEKS[idx];
+  const prevWeek = WEEKS[idx+1]; // semana anterior (en tu UI, idx+1 es “prev”)
+  if(!week) return;
+
+  const currentItems = await loadWeekItems(week);
+  const prevItems = prevWeek ? await loadWeekItems(prevWeek) : [];
+
+  const prevMap = new Map(prevItems.map(x => [x.id, computeFinal(x.ratings)]));
+
+  document.getElementById("lastUpdated").textContent = `Semana: ${week}`;
 
   const tbody = document.querySelector("#tbl tbody");
   tbody.innerHTML = "";
 
   const q = (document.getElementById("q").value || "").toLowerCase().trim();
 
-  const items = current.items
+  const items = currentItems
     .map(x => ({...x, final: computeFinal(x.ratings)}))
     .filter(x => x.final !== null)
     .sort((a,b)=> b.final - a.final)
@@ -215,7 +177,7 @@ function render(){
     if(typeof pr === "number"){
       const d = Math.round((x.final - pr)*100)/100;
       delta = d===0 ? "0" : (d>0 ? `▲ ${d}` : `▼ ${Math.abs(d)}`);
-    } else if(DATA[idx+1]){
+    } else if(prevWeek){
       delta = "NEW";
     } else {
       delta = "—";
@@ -231,18 +193,18 @@ function render(){
     tr.innerHTML = `
       <td class="center">${i+1}</td>
       <td class="wrap"><b>${x.title}</b></td>
-      <td>${x.release_es}</td>
-      <td><span class="tag">${x.release_type}</span></td>
-      <td>${x.country}</td>
-      <td>${x.language}</td>
-      <td class="wrap">${x.genre}</td>
-      <td class="center">${boolToYes(x.availability.cines)}</td>
-      <td class="center">${boolToYes(x.availability.netflix)}</td>
-      <td class="center">${boolToYes(x.availability.prime)}</td>
-      <td class="center">${boolToYes(x.availability.disney)}</td>
-      <td class="center">${boolToYes(x.availability.movistar)}</td>
-      <td class="right">${x.ratings.fa.toFixed(1)}</td>
-      <td class="right">${x.ratings.imdb.toFixed(1)}</td>
+      <td>${x.release_es ?? "N/D"}</td>
+      <td><span class="tag">${x.release_type ?? "N/D"}</span></td>
+      <td>${x.country ?? "N/D"}</td>
+      <td>${x.language ?? "N/D"}</td>
+      <td class="wrap">${x.genre ?? "N/D"}</td>
+      <td class="center">${boolToYes(!!x.availability?.cines)}</td>
+      <td class="center">${boolToYes(!!x.availability?.netflix)}</td>
+      <td class="center">${boolToYes(!!x.availability?.prime)}</td>
+      <td class="center">${boolToYes(!!x.availability?.disney)}</td>
+      <td class="center">${boolToYes(!!x.availability?.movistar)}</td>
+      <td class="right">${typeof x.ratings.fa==="number" ? x.ratings.fa.toFixed(1) : "N/D"}</td>
+      <td class="right">${typeof x.ratings.imdb==="number" ? x.ratings.imdb.toFixed(1) : "N/D"}</td>
       <td class="right">${rt}</td>
       <td class="right">${mc}</td>
       <td class="center">${coverage(x.ratings)}</td>
@@ -253,10 +215,31 @@ function render(){
   });
 }
 
-document.getElementById("q").addEventListener("input", render);
-document.getElementById("weekSelect").addEventListener("change", render);
-setWeekOptions();
-render();
+// ---------- INIT ----------
+document.getElementById("q").addEventListener("input", () => render());
+document.getElementById("weekSelect").addEventListener("change", () => render());
+
+(async function init(){
+  try{
+    await loadWeeksIndex();
+    await setWeekOptionsReal();
+    await render();
+
+    // Opcional: cambia títulos “demo” visualmente
+    document.title = "Películas · Radar semanal";
+    const h1 = document.querySelector("h1");
+    if(h1) h1.textContent = "🎬 Películas · Radar semanal";
+
+    const note = document.querySelector(".note");
+    if(note) {
+      note.innerHTML = `<b>IMPORTANTE:</b> datos reales (IMDb hoy). Añadiremos FA/RT/MC progresivamente.`;
+    }
+  } catch(e){
+    const note = document.querySelector(".note");
+    if(note) {
+      note.innerHTML = `<b>Error cargando datos reales:</b> ${e.message}<br/>Comprueba que existe <code>data/movies/index.json</code> y <code>data/movies/weeks/&lt;week&gt;.json</code>.`;
+    }
+    console.error(e);
+  }
+})();
 </script>
-</body>
-</html>
