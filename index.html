@@ -36,6 +36,7 @@
       background:rgba(255,255,255,.04);
       font-size:12px; color:var(--muted)
     }
+
     .grid{display:grid; grid-template-columns: repeat(12, 1fr); gap:14px; margin-top:18px}
     .card{
       grid-column: span 12;
@@ -57,12 +58,13 @@
       white-space:nowrap;
     }
     .list{padding:0 8px 10px}
+
     .row{
       display:grid;
-      grid-template-columns: 36px 1.4fr 120px;
+      grid-template-columns: 36px 1.4fr 160px;
       gap:10px;
-      align-items:center;
-      padding:10px 10px;
+      align-items:flex-start;
+      padding:12px 10px;
       border-top:1px solid var(--border);
     }
     .rank{
@@ -71,12 +73,44 @@
       background:rgba(96,165,250,.12);
       border:1px solid rgba(96,165,250,.22);
       font-weight:800; font-size:12px;
+      margin-top:2px;
     }
-    .title{display:flex; flex-direction:column; gap:2px}
-    .title b{font-size:13px}
+    .title{display:flex; flex-direction:column; gap:6px}
+    .title b{font-size:13px; line-height:1.25}
+    .title b a{color:inherit;text-decoration:none}
+    .title b a:hover{text-decoration:underline}
     .title span{font-size:12px; color:var(--muted)}
-    .score{font-variant-numeric: tabular-nums; text-align:right; font-weight:800}
-    .score small{display:block; color:var(--muted); font-weight:600; font-size:11px}
+
+    .platforms, .genres {display:flex; gap:6px; flex-wrap:wrap}
+    .badge{
+      display:inline-flex; align-items:center; gap:6px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.04);
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .badge.cines{border-color:rgba(255,255,255,.18)}
+    .badge strong{color:var(--text); font-weight:700}
+
+    .scorepill{
+      display:flex; flex-direction:column; align-items:flex-end; gap:6px;
+      padding-top:2px;
+    }
+    .pillScore{
+      display:inline-flex; align-items:center; justify-content:center;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.04);
+      border-radius:999px;
+      padding:6px 10px;
+      font-weight:800;
+      min-width: 92px;
+      font-variant-numeric: tabular-nums;
+    }
+    .submeta{color:var(--muted); font-size:11px; text-align:right}
+
     .err{
       margin-top:14px;
       border:1px solid rgba(176,0,32,.35);
@@ -87,6 +121,29 @@
       font-size: 13px;
       display:none;
     }
+
+    .featured{
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      box-shadow: var(--shadow);
+      padding:14px 14px 12px;
+      margin-top:14px;
+    }
+    .featured h3{margin:0 0 10px; font-size:14px}
+    .featuredGrid{display:grid;grid-template-columns:1fr;gap:10px}
+    @media (min-width: 900px){ .featuredGrid{grid-template-columns:1fr 1fr;} }
+    .featItem{
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.04);
+      border-radius:14px;
+      padding:12px;
+    }
+    .featItem .t{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .featItem .t b{font-size:13px}
+    .featItem a{color:inherit;text-decoration:none}
+    .featItem a:hover{text-decoration:underline}
+
     @media (min-width: 900px){
       .card.half{grid-column: span 6;}
     }
@@ -97,7 +154,7 @@
     <div class="topbar">
       <div>
         <h1>Radar semanal</h1>
-        <div class="sub">Top 5 en España · título FA (si existe) + géneros TMDb · link a FA/IMDb</div>
+        <div class="sub">Top 5 en España · título FA (si existe) · géneros · plataformas/cines · links a FA/IMDb</div>
       </div>
       <div class="chips">
         <div class="chip">Última actualización: <b id="updatedAt">—</b></div>
@@ -108,12 +165,17 @@
   <main class="wrap">
     <div id="err" class="err"></div>
 
+    <div class="featured" id="featured" style="display:none">
+      <h3>✨ Destacadas de la semana</h3>
+      <div class="featuredGrid" id="featuredGrid"></div>
+    </div>
+
     <div class="grid">
       <section class="card half">
         <div class="hd">
           <div>
             <h2>🎬 Películas · Top 5</h2>
-            <div class="meta">España · plataformas/cines · género destacado</div>
+            <div class="meta">España · plataformas/cines · estreno ES · género</div>
           </div>
           <span class="pill">Semana actual</span>
         </div>
@@ -124,7 +186,7 @@
         <div class="hd">
           <div>
             <h2>📺 Series · Top 5</h2>
-            <div class="meta">España · plataformas · género destacado</div>
+            <div class="meta">España · plataformas · estreno · género</div>
           </div>
           <span class="pill">Semana actual</span>
         </div>
@@ -134,33 +196,62 @@
   </main>
 
   <script>
+    function esc(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
+    function badge(text, cls=""){ return `<span class="badge ${cls}">${esc(text)}</span>`; }
+
     function rowHTML(item){
-      const platforms = Array.isArray(item.platforms) && item.platforms.length ? item.platforms.join(" · ") : "";
-      const where = item.inCinemasES
-        ? (platforms ? `Cines · ${platforms}` : "Cines")
-        : (platforms || item.where || "España");
+      const platformsArr = Array.isArray(item.platforms) ? item.platforms.filter(Boolean) : [];
+      const platforms = platformsArr.map(p => badge(p)).join("") || badge(item.where || "España");
+      const cines = item.inCinemasES ? badge("Cines", "cines") : "";
+      const release = item.releaseES ? badge(`ES: ${item.releaseES}`) : "";
 
-      const release = item.releaseES ? ` · ES: ${item.releaseES}` : "";
-
-      const genres = Array.isArray(item.genres) && item.genres.length
-        ? ` · <b>${item.genres.slice(0,3).join(" / ")}</b>`
-        : "";
+      const genresArr = Array.isArray(item.genres) ? item.genres.slice(0,3) : [];
+      const genres = genresArr.length ? genresArr.map(g => badge(g)).join("") : "";
 
       const href = item.faUrl || item.imdbUrl || null;
+      const title = esc(item.title ?? "—");
       const titleHTML = href
-        ? `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">${item.title ?? "—"} ↗</a>`
-        : (item.title ?? "—");
+        ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${title} ↗</a>`
+        : title;
 
       const final = (typeof item.final === "number") ? item.final.toFixed(2) : "—";
+      const cov = item.coverage ? `Cobertura ${item.coverage}` : "";
 
       return `
         <div class="row">
           <div class="rank">${item.rank ?? ""}</div>
           <div class="title">
             <b>${titleHTML}</b>
-            <span>${where}${release}${genres}</span>
+            <div class="platforms">${cines}${platforms}${release}</div>
+            ${genres ? `<div class="genres">${genres}</div>` : ``}
           </div>
-          <div class="score">${final}<small>Final</small></div>
+          <div class="scorepill">
+            <div class="pillScore">${final}</div>
+            <div class="submeta">${esc(cov)}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function featuredCard(label, x){
+      if(!x) return "";
+      const href = x.faUrl || x.imdbUrl || "#";
+      const p = Array.isArray(x.platforms) && x.platforms.length ? x.platforms.join(" · ") : (x.where || "España");
+      const g = Array.isArray(x.genres) && x.genres.length ? x.genres.slice(0,3).join(" / ") : "—";
+      const c = x.inCinemasES ? "Cines · " : "";
+      const final = (typeof x.final === "number") ? x.final.toFixed(2) : "—";
+
+      return `
+        <div class="featItem">
+          <div class="t">
+            <div>
+              <div class="submeta">${esc(label)}</div>
+              <b><a href="${href}" target="_blank" rel="noopener noreferrer">${esc(x.title)} ↗</a></b>
+              <div class="submeta">${esc(c + p)}${x.releaseES ? " · ES: " + esc(x.releaseES) : ""}</div>
+              <div class="submeta">Género: ${esc(g)}</div>
+            </div>
+            <div class="pillScore">${final}</div>
+          </div>
         </div>
       `;
     }
@@ -183,11 +274,28 @@
         document.getElementById("seriesList").innerHTML =
           series.length ? series.map(rowHTML).join("") : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>Ejecuta el workflow</span></div><div></div></div>`;
 
+        // Destacadas
+        const featured = document.getElementById("featured");
+        const featuredGrid = document.getElementById("featuredGrid");
+        const topMovie = movies[0];
+        const topSerie = series[0];
+
+        if (topMovie || topSerie){
+          featured.style.display = "block";
+          featuredGrid.innerHTML = [
+            featuredCard("🎬 #1 Película", topMovie),
+            featuredCard("📺 #1 Serie", topSerie)
+          ].join("");
+        } else {
+          featured.style.display = "none";
+        }
+
       } catch(e){
         err.style.display = "block";
-        err.innerHTML = `<b>Error:</b> ${e.message}<br><span style="color:var(--muted)">Comprueba que existe <code>data/latest.json</code> en GitHub Pages.</span>`;
+        err.innerHTML = `<b>Error:</b> ${esc(e.message)}<br><span style="color:var(--muted)">Comprueba que existe <code>data/latest.json</code> en GitHub Pages.</span>`;
         document.getElementById("moviesList").innerHTML = "";
         document.getElementById("seriesList").innerHTML = "";
+        document.getElementById("featured").style.display = "none";
       }
     }
 
