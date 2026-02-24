@@ -123,6 +123,7 @@
       display:none;
     }
 
+    /* ===== Destacadas (DISEÑO ANTERIOR) ===== */
     .featured{
       border:1px solid var(--border);
       border-radius: var(--radius);
@@ -132,14 +133,24 @@
       margin-top:14px;
     }
     .featured h3{margin:0 0 10px; font-size:14px}
+    .featuredGrid{display:grid;grid-template-columns:1fr;gap:10px}
+    @media (min-width: 900px){ .featuredGrid{grid-template-columns:1fr 1fr;} }
+    .featItem{
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.04);
+      border-radius:14px;
+      padding:12px;
+    }
+    .featItem .t{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .featItem .t b{font-size:13px}
+    .featItem a{color:inherit;text-decoration:none}
+    .featItem a:hover{text-decoration:underline}
+    /* ======================================= */
 
     @media (min-width: 900px){
       .card.half{grid-column: span 6;}
     }
   </style>
-
-  <!-- CSS externo DESPUÉS del <style> para que tenga prioridad -->
-  <link rel="stylesheet" href="./styles.css?v=1">
 </head>
 
 <body>
@@ -192,7 +203,42 @@
     function esc(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
     function badge(text, cls=""){ return `<span class="badge ${cls}">${esc(text)}</span>`; }
 
-    function rowHTML(item){
+    // ---- Cobertura: parsea "2/6" -> {num:2, den:6}. Acepta "0", 0, null.
+    function parseCoverage(cov){
+      if(cov == null) return { num: null, den: null };
+      if(typeof cov === "number") return { num: cov, den: null };
+      const s = String(cov).trim();
+      const m = s.match(/^(\d+)\s*\/\s*(\d+)$/);
+      if(m) return { num: Number(m[1]), den: Number(m[2]) };
+      const n = Number(s);
+      if(Number.isFinite(n)) return { num: n, den: null };
+      return { num: null, den: null };
+    }
+
+    // ---- Excluir items con cobertura 0 (ej. "0/6", "0/8", 0, "0")
+    function hasZeroCoverage(item){
+      const { num, den } = parseCoverage(item?.coverage);
+      if(num == null) return false;            // si no sabemos, NO lo excluimos
+      if(den == null) return num <= 0;         // "0" o 0 => fuera
+      return num <= 0;                         // "0/6" => fuera
+    }
+
+    // ---- Score final seguro (si no hay final, usa -Inf para ir al final)
+    function finalScore(item){
+      return (typeof item?.final === "number") ? item.final : -Infinity;
+    }
+
+    // ---- Prepara ranking: filtra cobertura 0 y ordena por final desc
+    function prepareRanking(arr){
+      const clean = (Array.isArray(arr) ? arr : [])
+        .filter(Boolean)
+        .filter(x => !hasZeroCoverage(x)); // <-- AQUÍ se excluye 0/6
+
+      clean.sort((a,b) => finalScore(b) - finalScore(a));
+      return clean;
+    }
+
+    function rowHTML(item, idx){
       const platformsArr = Array.isArray(item.platforms) ? item.platforms.filter(Boolean) : [];
       const platforms = platformsArr.map(p => badge(p)).join("") || badge(item.where || "España");
       const cines = item.inCinemasES ? badge("Cines", "cines") : "";
@@ -212,7 +258,7 @@
 
       return `
         <div class="row">
-          <div class="rank">${item.rank ?? ""}</div>
+          <div class="rank">${idx + 1}</div>
           <div class="title">
             <b>${titleHTML}</b>
             <div class="platforms">${cines}${platforms}${release}</div>
@@ -226,56 +272,25 @@
       `;
     }
 
-    function pickImage(x){
-      return x?.posterUrl || x?.image || x?.img || x?.poster || x?.backdropUrl || x?.backdrop || "";
-    }
-
+    // ---- Destacada (diseño anterior): TÍTULO UNA VEZ (con link)
     function featuredCard(label, x){
       if(!x) return "";
       const href = x.faUrl || x.imdbUrl || "#";
-
-      const platformsTxt = Array.isArray(x.platforms) && x.platforms.length
-        ? x.platforms.filter(Boolean).slice(0,2).join(" · ")
-        : (x.where || "España");
-
-      const genresTxt = Array.isArray(x.genres) && x.genres.length
-        ? x.genres.filter(Boolean).slice(0,2).join(" · ")
-        : "";
-
-      const cines = x.inCinemasES ? "Cines" : "";
-      const release = x.releaseES ? `ES: ${x.releaseES}` : "";
+      const p = Array.isArray(x.platforms) && x.platforms.length ? x.platforms.join(" · ") : (x.where || "España");
+      const g = Array.isArray(x.genres) && x.genres.length ? x.genres.slice(0,3).join(" / ") : "—";
+      const c = x.inCinemasES ? "Cines · " : "";
       const final = (typeof x.final === "number") ? x.final.toFixed(2) : "—";
-
-      const img = pickImage(x);
-
-      const media = img
-        ? `<div class="featMedia"><img src="${img}" alt="Imagen de ${esc(x.title)}" loading="lazy" decoding="async"></div>`
-        : `<div class="featMedia featMedia--empty" aria-hidden="true"><span>${esc(x.title)}</span></div>`;
-
-      const metaBadges = [
-        cines ? badge(cines, "cines") : "",
-        platformsTxt ? badge(platformsTxt) : "",
-        release ? badge(release) : "",
-        genresTxt ? badge(genresTxt) : ""
-      ].filter(Boolean).join("");
 
       return `
         <div class="featItem">
           <div class="t">
-            ${media}
-
-            <div class="featContent">
-              <div class="featKicker">${esc(label)}</div>
-              <p class="featTitle">
-                <a href="${href}" target="_blank" rel="noopener noreferrer">${esc(x.title)} ↗</a>
-              </p>
-              <div class="featMeta">${metaBadges}</div>
+            <div>
+              <div class="submeta">${esc(label)}</div>
+              <b><a href="${href}" target="_blank" rel="noopener noreferrer">${esc(x.title)} ↗</a></b>
+              <div class="submeta">${esc(c + p)}${x.releaseES ? " · ES: " + esc(x.releaseES) : ""}</div>
+              <div class="submeta">Género: ${esc(g)}</div>
             </div>
-
-            <div class="featScore">
-              <div class="pillScore">${final}</div>
-              <div class="submeta">${esc(x.coverage ? ("Cobertura " + x.coverage) : "")}</div>
-            </div>
+            <div class="pillScore">${final}</div>
           </div>
         </div>
       `;
@@ -290,19 +305,32 @@
 
         document.getElementById("updatedAt").textContent = data.updatedAt || "—";
 
-        const movies = Array.isArray(data.movies) ? data.movies : [];
-        const series = Array.isArray(data.series) ? data.series : [];
+        // 1) Filtra cobertura 0/6 y ordena por final desc
+        const moviesAll = Array.isArray(data.movies) ? data.movies : [];
+        const seriesAll = Array.isArray(data.series) ? data.series : [];
+
+        const moviesRanked = prepareRanking(moviesAll);
+        const seriesRanked = prepareRanking(seriesAll);
+
+        // 2) Top 5 ya “limpio”
+        const moviesTop = moviesRanked.slice(0, 5);
+        const seriesTop = seriesRanked.slice(0, 5);
 
         document.getElementById("moviesList").innerHTML =
-          movies.length ? movies.map(rowHTML).join("") : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>Ejecuta el workflow</span></div><div></div></div>`;
+          moviesTop.length
+            ? moviesTop.map((x,i) => rowHTML(x,i)).join("")
+            : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay títulos con cobertura &gt; 0</span></div><div></div></div>`;
 
         document.getElementById("seriesList").innerHTML =
-          series.length ? series.map(rowHTML).join("") : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>Ejecuta el workflow</span></div><div></div></div>`;
+          seriesTop.length
+            ? seriesTop.map((x,i) => rowHTML(x,i)).join("")
+            : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay títulos con cobertura &gt; 0</span></div><div></div></div>`;
 
+        // 3) Destacadas = #1 de cada ranking (ya filtrado)
         const featured = document.getElementById("featured");
         const featuredGrid = document.getElementById("featuredGrid");
-        const topMovie = movies[0];
-        const topSerie = series[0];
+        const topMovie = moviesTop[0];
+        const topSerie = seriesTop[0];
 
         if (topMovie || topSerie){
           featured.style.display = "block";
