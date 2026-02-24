@@ -97,7 +97,7 @@
     <div class="topbar">
       <div>
         <h1>Radar semanal</h1>
-        <div class="sub">Top 5 en España · hoy: <b>IMDb + FA</b> (RT/Metacritic mañana)</div>
+        <div class="sub">Top 5 en España · título FA (si existe) + géneros TMDb · link a FA/IMDb</div>
       </div>
       <div class="chips">
         <div class="chip">Última actualización: <b id="updatedAt">—</b></div>
@@ -113,7 +113,7 @@
         <div class="hd">
           <div>
             <h2>🎬 Películas · Top 5</h2>
-            <div class="meta">Título ES · plataformas ES · estreno ES</div>
+            <div class="meta">España · plataformas/cines · género destacado</div>
           </div>
           <span class="pill">Semana actual</span>
         </div>
@@ -124,7 +124,7 @@
         <div class="hd">
           <div>
             <h2>📺 Series · Top 5</h2>
-            <div class="meta">Título ES · plataformas ES · estreno</div>
+            <div class="meta">España · plataformas · género destacado</div>
           </div>
           <span class="pill">Semana actual</span>
         </div>
@@ -135,23 +135,32 @@
 
   <script>
     function rowHTML(item){
-      const platforms = Array.isArray(item.platforms) && item.platforms.length
-        ? item.platforms.join(" · ")
-        : (item.where ?? "España");
+      const platforms = Array.isArray(item.platforms) && item.platforms.length ? item.platforms.join(" · ") : "";
+      const where = item.inCinemasES
+        ? (platforms ? `Cines · ${platforms}` : "Cines")
+        : (platforms || item.where || "España");
 
       const release = item.releaseES ? ` · ES: ${item.releaseES}` : "";
-      const fa = (typeof item.fa === "number") ? item.fa.toFixed(1) : "—";
-      const imdb = (typeof item.imdb === "number") ? item.imdb.toFixed(1) : "—";
+
+      const genres = Array.isArray(item.genres) && item.genres.length
+        ? ` · <b>${item.genres.slice(0,3).join(" / ")}</b>`
+        : "";
+
+      const href = item.faUrl || item.imdbUrl || null;
+      const titleHTML = href
+        ? `<a href="${href}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">${item.title ?? "—"} ↗</a>`
+        : (item.title ?? "—");
+
       const final = (typeof item.final === "number") ? item.final.toFixed(2) : "—";
 
       return `
         <div class="row">
           <div class="rank">${item.rank ?? ""}</div>
           <div class="title">
-            <b>${item.title ?? "—"}</b>
-            <span>${platforms}${release}</span>
+            <b>${titleHTML}</b>
+            <span>${where}${release}${genres}</span>
           </div>
-          <div class="score">${final}<small>Final (FA+IMDb)</small></div>
+          <div class="score">${final}<small>Final</small></div>
         </div>
       `;
     }
