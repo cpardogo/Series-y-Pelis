@@ -59,7 +59,7 @@
     .list{padding:0 8px 10px}
     .row{
       display:grid;
-      grid-template-columns: 36px 1.4fr 110px;
+      grid-template-columns: 36px 1.4fr 120px;
       gap:10px;
       align-items:center;
       padding:10px 10px;
@@ -97,11 +97,10 @@
     <div class="topbar">
       <div>
         <h1>Radar semanal</h1>
-        <div class="sub">Top 5 en España · ahora mismo usamos <b>IMDb</b> (y añadiremos FA/RT/Metacritic después)</div>
+        <div class="sub">Top 5 en España · hoy: <b>IMDb + FA</b> (RT/Metacritic mañana)</div>
       </div>
       <div class="chips">
         <div class="chip">Última actualización: <b id="updatedAt">—</b></div>
-        <div class="chip">Fuente: cine + plataformas</div>
       </div>
     </div>
   </header>
@@ -114,7 +113,7 @@
         <div class="hd">
           <div>
             <h2>🎬 Películas · Top 5</h2>
-            <div class="meta">Estrenos recientes (cine + streaming)</div>
+            <div class="meta">Título ES · plataformas ES · estreno ES</div>
           </div>
           <span class="pill">Semana actual</span>
         </div>
@@ -125,7 +124,7 @@
         <div class="hd">
           <div>
             <h2>📺 Series · Top 5</h2>
-            <div class="meta">Estrenos / temporadas recientes</div>
+            <div class="meta">Título ES · plataformas ES · estreno</div>
           </div>
           <span class="pill">Semana actual</span>
         </div>
@@ -136,16 +135,23 @@
 
   <script>
     function rowHTML(item){
-      const where = item.where ?? item.platform ?? "";
-      const imdb = (typeof item.imdb === "number") ? item.imdb.toFixed(1) : (item.imdb ?? "—");
+      const platforms = Array.isArray(item.platforms) && item.platforms.length
+        ? item.platforms.join(" · ")
+        : (item.where ?? "España");
+
+      const release = item.releaseES ? ` · ES: ${item.releaseES}` : "";
+      const fa = (typeof item.fa === "number") ? item.fa.toFixed(1) : "—";
+      const imdb = (typeof item.imdb === "number") ? item.imdb.toFixed(1) : "—";
+      const final = (typeof item.final === "number") ? item.final.toFixed(2) : "—";
+
       return `
         <div class="row">
           <div class="rank">${item.rank ?? ""}</div>
           <div class="title">
             <b>${item.title ?? "—"}</b>
-            <span>${where}</span>
+            <span>${platforms}${release}</span>
           </div>
-          <div class="score">${imdb}<small>IMDb</small></div>
+          <div class="score">${final}<small>Final (FA+IMDb)</small></div>
         </div>
       `;
     }
