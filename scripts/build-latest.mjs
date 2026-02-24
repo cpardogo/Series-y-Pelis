@@ -280,10 +280,26 @@ function coverage(x) {
   return `${have}/6`;
 }
 
+/**
+ * Devuelve TRUE si coverage es > 0/6
+ * - coverage siempre es string tipo "2/6"
+ */
+function hasCoverage(item) {
+  const c = String(item?.coverage ?? "").trim();
+  const m = c.match(/^(\d+)\s*\/\s*(\d+)$/);
+  if (!m) return false;
+  const have = Number(m[1]);
+  return Number.isFinite(have) && have > 0;
+}
+
+/**
+ * Top N solo con cobertura (>0/6)
+ * - Orden: final -> imdb -> fa (no tmdb si coverage es 0/6 porque ya se filtró)
+ */
 const pickTop = (items, n = 5) =>
   items
-    .filter((x) => typeof x.final === "number" || typeof x.imdb === "number" || typeof x.fa === "number" || typeof x.tmdb === "number")
-    .sort((a, b) => (b.final ?? b.imdb ?? b.fa ?? b.tmdb ?? 0) - (a.final ?? a.imdb ?? a.fa ?? a.tmdb ?? 0))
+    .filter((x) => x && hasCoverage(x)) // ✅ elimina 0/6 y sin cobertura
+    .sort((a, b) => (b.final ?? b.imdb ?? b.fa ?? 0) - (a.final ?? a.imdb ?? a.fa ?? 0))
     .slice(0, n)
     .map((x, idx) => ({ rank: idx + 1, ...x }));
 
@@ -348,9 +364,12 @@ const buildMoviesES = async () => {
       imdbId,
     };
 
-    // final normalizado; si no hay nada, fallback a imdb o tmdb
-    item.final = computeFinal(item) ?? item.imdb ?? item.tmdb ?? null;
+    // final: SOLO basado en fuentes (FA/IMDb/RT/MC); si no hay, queda null
+    item.final = computeFinal(item) ?? item.imdb ?? item.fa ?? null;
     item.coverage = coverage(item);
+
+    // ✅ Elimina aquí mismo los 0/6 (ahorra ruido)
+    if (!hasCoverage(item)) continue;
 
     enriched.push(item);
   }
@@ -419,8 +438,12 @@ const buildSeriesES = async () => {
       imdbId,
     };
 
-    item.final = computeFinal(item) ?? item.imdb ?? item.tmdb ?? null;
+    // final: SOLO basado en fuentes (FA/IMDb/RT/MC); si no hay, queda null
+    item.final = computeFinal(item) ?? item.imdb ?? item.fa ?? null;
     item.coverage = coverage(item);
+
+    // ✅ Elimina aquí mismo los 0/6
+    if (!hasCoverage(item)) continue;
 
     enriched.push(item);
   }
