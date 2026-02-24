@@ -139,7 +139,7 @@
   </style>
 
   <!-- CSS externo DESPUÉS del <style> para que tenga prioridad -->
-  <link rel="stylesheet" href="./styles.css?v=3">
+  <link rel="stylesheet" href="./styles.css?v=1">
 </head>
 
 <body>
@@ -233,9 +233,17 @@
     function featuredCard(label, x){
       if(!x) return "";
       const href = x.faUrl || x.imdbUrl || "#";
-      const p = Array.isArray(x.platforms) && x.platforms.length ? x.platforms.join(" · ") : (x.where || "España");
-      const g = Array.isArray(x.genres) && x.genres.length ? x.genres.slice(0,3).join(" / ") : "—";
-      const c = x.inCinemasES ? "Cines · " : "";
+
+      const platformsTxt = Array.isArray(x.platforms) && x.platforms.length
+        ? x.platforms.filter(Boolean).slice(0,2).join(" · ")
+        : (x.where || "España");
+
+      const genresTxt = Array.isArray(x.genres) && x.genres.length
+        ? x.genres.filter(Boolean).slice(0,2).join(" · ")
+        : "";
+
+      const cines = x.inCinemasES ? "Cines" : "";
+      const release = x.releaseES ? `ES: ${x.releaseES}` : "";
       const final = (typeof x.final === "number") ? x.final.toFixed(2) : "—";
 
       const img = pickImage(x);
@@ -244,17 +252,30 @@
         ? `<div class="featMedia"><img src="${img}" alt="Imagen de ${esc(x.title)}" loading="lazy" decoding="async"></div>`
         : `<div class="featMedia featMedia--empty" aria-hidden="true"><span>${esc(x.title)}</span></div>`;
 
+      const metaBadges = [
+        cines ? badge(cines, "cines") : "",
+        platformsTxt ? badge(platformsTxt) : "",
+        release ? badge(release) : "",
+        genresTxt ? badge(genresTxt) : ""
+      ].filter(Boolean).join("");
+
       return `
         <div class="featItem">
           <div class="t">
             ${media}
-            <div>
-              <div class="submeta">${esc(label)}</div>
-              <b><a href="${href}" target="_blank" rel="noopener noreferrer">${esc(x.title)} ↗</a></b>
-              <div class="submeta">${esc(c + p)}${x.releaseES ? " · ES: " + esc(x.releaseES) : ""}</div>
-              <div class="submeta">Género: ${esc(g)}</div>
+
+            <div class="featContent">
+              <div class="featKicker">${esc(label)}</div>
+              <p class="featTitle">
+                <a href="${href}" target="_blank" rel="noopener noreferrer">${esc(x.title)} ↗</a>
+              </p>
+              <div class="featMeta">${metaBadges}</div>
             </div>
-            <div class="pillScore">${final}</div>
+
+            <div class="featScore">
+              <div class="pillScore">${final}</div>
+              <div class="submeta">${esc(x.coverage ? ("Cobertura " + x.coverage) : "")}</div>
+            </div>
           </div>
         </div>
       `;
@@ -278,7 +299,6 @@
         document.getElementById("seriesList").innerHTML =
           series.length ? series.map(rowHTML).join("") : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>Ejecuta el workflow</span></div><div></div></div>`;
 
-        // Destacadas
         const featured = document.getElementById("featured");
         const featuredGrid = document.getElementById("featuredGrid");
         const topMovie = movies[0];
