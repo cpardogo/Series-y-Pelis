@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Radar semanal · Series & Películas</title>  
-  <link rel="stylesheet" href="./styles.css">
+  <title>Radar semanal · Series & Películas</title>
+
   <style>
     :root{
       --bg:#0b0f19; --panel:#111827; --text:#e5e7eb; --muted:#9ca3af; --border:rgba(255,255,255,.08);
@@ -132,24 +132,16 @@
       margin-top:14px;
     }
     .featured h3{margin:0 0 10px; font-size:14px}
-    .featuredGrid{display:grid;grid-template-columns:1fr;gap:10px}
-    @media (min-width: 900px){ .featuredGrid{grid-template-columns:1fr 1fr;} }
-    .featItem{
-      border:1px solid var(--border);
-      background:rgba(255,255,255,.04);
-      border-radius:14px;
-      padding:12px;
-    }
-    .featItem .t{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
-    .featItem .t b{font-size:13px}
-    .featItem a{color:inherit;text-decoration:none}
-    .featItem a:hover{text-decoration:underline}
 
     @media (min-width: 900px){
       .card.half{grid-column: span 6;}
     }
   </style>
+
+  <!-- CSS externo DESPUÉS del <style> para que tenga prioridad -->
+  <link rel="stylesheet" href="./styles.css?v=3">
 </head>
+
 <body>
   <header>
     <div class="topbar">
@@ -234,6 +226,10 @@
       `;
     }
 
+    function pickImage(x){
+      return x?.posterUrl || x?.image || x?.img || x?.poster || x?.backdropUrl || x?.backdrop || "";
+    }
+
     function featuredCard(label, x){
       if(!x) return "";
       const href = x.faUrl || x.imdbUrl || "#";
@@ -242,9 +238,16 @@
       const c = x.inCinemasES ? "Cines · " : "";
       const final = (typeof x.final === "number") ? x.final.toFixed(2) : "—";
 
+      const img = pickImage(x);
+
+      const media = img
+        ? `<div class="featMedia"><img src="${img}" alt="Imagen de ${esc(x.title)}" loading="lazy" decoding="async"></div>`
+        : `<div class="featMedia featMedia--empty" aria-hidden="true"><span>${esc(x.title)}</span></div>`;
+
       return `
         <div class="featItem">
           <div class="t">
+            ${media}
             <div>
               <div class="submeta">${esc(label)}</div>
               <b><a href="${href}" target="_blank" rel="noopener noreferrer">${esc(x.title)} ↗</a></b>
