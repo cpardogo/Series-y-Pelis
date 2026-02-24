@@ -3,12 +3,19 @@
   "movies": [
     {
       "rank": 1,
-      "title": "One Mile: Chapter One",
-      "titleOriginal": "One Mile: Chapter One",
+      "title": "One Mile",
+      "titleTmdbEs": "One Mile: Chapter One",
+      "faTitle": "One Mile",
+      "faUrl": "https://www.filmaffinity.com/es/film523138.html",
+      "imdbUrl": "https://www.imdb.com/title/tt24326458/",
       "releaseES": "2026-02-20",
       "platforms": [],
       "inCinemasES": false,
       "where": "España",
+      "genres": [
+        "Acción",
+        "Crimen"
+      ],
       "fa": null,
       "imdb": null,
       "rtCrit": null,
@@ -22,12 +29,20 @@
     },
     {
       "rank": 2,
-      "title": "28 años después: El templo de los huesos",
-      "titleOriginal": "28 Years Later: The Bone Temple",
+      "title": "28 años después",
+      "titleTmdbEs": "28 años después: El templo de los huesos",
+      "faTitle": "28 años después",
+      "faUrl": "https://www.filmaffinity.com/es/film836464.html",
+      "imdbUrl": "https://www.imdb.com/title/tt32141377/",
       "releaseES": "2026-01-16",
       "platforms": [],
       "inCinemasES": true,
       "where": "Cines",
+      "genres": [
+        "Terror",
+        "Suspense",
+        "Ciencia ficción"
+      ],
       "fa": 6.5,
       "imdb": 7.6,
       "rtCrit": null,
@@ -42,11 +57,18 @@
     {
       "rank": 3,
       "title": "Ruta de escape",
-      "titleOriginal": "Crime 101",
+      "titleTmdbEs": "Ruta de escape",
+      "faTitle": "Ruta de escape",
+      "faUrl": "https://www.filmaffinity.com/es/film960118.html",
+      "imdbUrl": "https://www.imdb.com/title/tt32430579/",
       "releaseES": "2026-02-13",
       "platforms": [],
       "inCinemasES": true,
       "where": "Cines",
+      "genres": [
+        "Crimen",
+        "Suspense"
+      ],
       "fa": 6.6,
       "imdb": 7.2,
       "rtCrit": null,
@@ -61,11 +83,17 @@
     {
       "rank": 4,
       "title": "The Dreadful",
-      "titleOriginal": "The Dreadful",
+      "titleTmdbEs": "The Dreadful",
+      "faTitle": "The Dreadful",
+      "faUrl": "https://www.filmaffinity.com/es/film396411.html",
+      "imdbUrl": "https://www.imdb.com/title/tt30842022/",
       "releaseES": "2026-02-20",
       "platforms": [],
       "inCinemasES": false,
       "where": "España",
+      "genres": [
+        "Terror"
+      ],
       "fa": null,
       "imdb": null,
       "rtCrit": null,
@@ -79,12 +107,20 @@
     },
     {
       "rank": 5,
-      "title": "Shelter: El Protector",
-      "titleOriginal": "Shelter",
+      "title": "Climax",
+      "titleTmdbEs": "Shelter: El Protector",
+      "faTitle": "Climax",
+      "faUrl": "https://www.filmaffinity.com/es/film509136.html",
+      "imdbUrl": "https://www.imdb.com/title/tt32357218/",
       "releaseES": "2026-03-27",
       "platforms": [],
       "inCinemasES": true,
       "where": "Cines",
+      "genres": [
+        "Acción",
+        "Crimen",
+        "Suspense"
+      ],
       "fa": 6.6,
       "imdb": 6.4,
       "rtCrit": null,
@@ -100,14 +136,23 @@
   "series": [
     {
       "rank": 1,
-      "title": "Sentenced to Be a Hero",
-      "titleOriginal": "勇者刑に処す 懲罰勇者9004隊刑務記録",
+      "title": "Sentenced to Be a Hero SerieAnimación",
+      "titleTmdbEs": "Sentenced to Be a Hero",
+      "faTitle": "Sentenced to Be a Hero SerieAnimación",
+      "faUrl": "https://www.filmaffinity.com/es/film777185.html",
+      "imdbUrl": "https://www.imdb.com/title/tt32536168/",
       "releaseES": "2026-01-03",
       "platforms": [
         "Crunchyroll",
         "Crunchyroll Amazon Channel"
       ],
+      "inCinemasES": false,
       "where": "Crunchyroll · Crunchyroll Amazon Channel",
+      "genres": [
+        "Animación",
+        "Action & Adventure",
+        "Sci-Fi & Fantasy"
+      ],
       "fa": 7.4,
       "imdb": 8.9,
       "rtCrit": null,
@@ -121,15 +166,24 @@
     },
     {
       "rank": 2,
-      "title": "El caballero de los Siete Reinos",
-      "titleOriginal": "A Knight of the Seven Kingdoms",
+      "title": "El caballero de los Siete Reinos Serie",
+      "titleTmdbEs": "El caballero de los Siete Reinos",
+      "faTitle": "El caballero de los Siete Reinos Serie",
+      "faUrl": "https://www.filmaffinity.com/es/film555260.html",
+      "imdbUrl": "https://www.imdb.com/title/tt27497448/",
       "releaseES": "2026-01-18",
       "platforms": [
         "Movistar Plus+ Ficción Total ",
         "HBO Max",
         "HBO Max  Amazon Channel"
       ],
+      "inCinemasES": false,
       "where": "Movistar Plus+ Ficción Total  · HBO Max · HBO Max  Amazon Channel",
+      "genres": [
+        "Drama",
+        "Sci-Fi & Fantasy",
+        "Action & Adventure"
+      ],
       "fa": 7.8,
       "imdb": null,
       "rtCrit": null,
@@ -143,14 +197,22 @@
     },
     {
       "rank": 3,
-      "title": "El Mochaorejas",
-      "titleOriginal": "El Mochaorejas",
+      "title": "El Mochaorejas Serie",
+      "titleTmdbEs": "El Mochaorejas",
+      "faTitle": "El Mochaorejas Serie",
+      "faUrl": "https://www.filmaffinity.com/es/film901574.html",
+      "imdbUrl": "https://www.imdb.com/title/tt39395780/",
       "releaseES": "2026-01-23",
       "platforms": [
         "Atres Player",
         "Amazon Prime Video"
       ],
+      "inCinemasES": false,
       "where": "Atres Player · Amazon Prime Video",
+      "genres": [
+        "Drama",
+        "Crimen"
+      ],
       "fa": null,
       "imdb": null,
       "rtCrit": null,
@@ -164,15 +226,23 @@
     },
     {
       "rank": 4,
-      "title": "Niños de plomo",
-      "titleOriginal": "Ołowiane dzieci",
+      "title": "Niños de plomo Miniserie",
+      "titleTmdbEs": "Niños de plomo",
+      "faTitle": "Niños de plomo Miniserie",
+      "faUrl": "https://www.filmaffinity.com/es/film970230.html",
+      "imdbUrl": "https://www.imdb.com/title/tt33322230/",
       "releaseES": "2026-02-11",
       "platforms": [
         "Netflix",
         "Netflix Standard with Ads"
       ],
+      "inCinemasES": false,
       "where": "Netflix · Netflix Standard with Ads",
-      "fa": 6.6,
+      "genres": [
+        "Drama",
+        "War & Politics"
+      ],
+      "fa": 6.5,
       "imdb": 7.6,
       "rtCrit": null,
       "rtAud": null,
@@ -180,19 +250,28 @@
       "mcUser": null,
       "tmdb": 8.5,
       "imdbId": "tt33322230",
-      "final": 7.1,
+      "final": 7.05,
       "coverage": "2/6"
     },
     {
       "rank": 5,
-      "title": "Jack-of-All-Trades, Party of None",
-      "titleOriginal": "勇者パーティを追い出された器用貧乏",
+      "title": "Jack-of-All-Trades, Party of None SerieAnimación",
+      "titleTmdbEs": "Jack-of-All-Trades, Party of None",
+      "faTitle": "Jack-of-All-Trades, Party of None SerieAnimación",
+      "faUrl": "https://www.filmaffinity.com/es/film199162.html",
+      "imdbUrl": "https://www.imdb.com/title/tt38648925/",
       "releaseES": "2026-01-04",
       "platforms": [
         "Crunchyroll",
         "Crunchyroll Amazon Channel"
       ],
+      "inCinemasES": false,
       "where": "Crunchyroll · Crunchyroll Amazon Channel",
+      "genres": [
+        "Animación",
+        "Action & Adventure",
+        "Sci-Fi & Fantasy"
+      ],
       "fa": null,
       "imdb": 7,
       "rtCrit": null,
