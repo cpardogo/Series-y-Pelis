@@ -10,13 +10,12 @@ if (!OMDB_KEY) throw new Error("Missing OMDB_API_KEY secret");
 // ---------------------- Helpers ----------------------
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-const tmdb = async (path, params = {}) => {
-  const url = new URL(`https://api.themoviedb.org/3/${path}`);
+const tmdb = async (p, params = {}) => {
+  const url = new URL(`https://api.themoviedb.org/3/${p}`);
   url.searchParams.set("api_key", TMDB_KEY);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
-
   const r = await fetch(url);
-  if (!r.ok) throw new Error(`TMDb error ${r.status} on ${path}`);
+  if (!r.ok) throw new Error(`TMDb error ${r.status} on ${p}`);
   return r.json();
 };
 
@@ -25,14 +24,83 @@ const omdbByImdbId = async (imdbId) => {
   const url = new URL("https://www.omdbapi.com/");
   url.searchParams.set("apikey", OMDB_KEY);
   url.searchParams.set("i", imdbId);
-
   const r = await fetch(url);
   const j = await r.json();
   if (j?.Response === "False") return null;
-
   const rating = Number(j.imdbRating);
   return Number.isFinite(rating) ? rating : null;
 };
+
+// ---------------------- TMDb ES details + providers ----------------------
+async function getMovieESDetails(id) {
+  const d = await tmdb(`movie/${id}`, { language: "es-ES" });
+
+  // fecha de estreno ES (si existe en release_dates)
+  let releaseES = d.release_date || null;
+  try {
+    const rd = await tmdb(`movie/${id}/release_dates`);
+    const es = (rd.results || []).find((x) => x.iso_3166_1 === "ES");
+    const date = es?.release_dates?.[0]?.release_date;
+    if (date) releaseES = date.slice(0, 10);
+  } catch {}
+
+  // plataformas ES
+  let platforms = [];
+  try {
+    const wp = await tmdb(`movie/${id}/watch/providers`);
+    const es = wp.results?.ES;
+    const list = [
+      ...(es?.flatrate || []),
+      ...(es?.rent || []),
+      ...(es?.buy || []),
+    ];
+    const uniq = new Map();
+    for (const p of list) {
+      if (!p?.provider_id) continue;
+      uniq.set(p.provider_id, p.provider_name || `Provider ${p.provider_id}`);
+    }
+    platforms = [...uniq.values()].slice(0, 6);
+  } catch {}
+
+  return {
+    titleEs: d.title || null,
+    titleOriginal: d.original_title || null,
+    releaseES,
+    platforms,
+  };
+}
+
+async function getSeriesESDetails(id) {
+  const d = await tmdb(`tv/${id}`, { language: "es-ES" });
+
+  // para series: primera emisión
+  const releaseES = d.first_air_date || null;
+
+  // plataformas ES
+  let platforms = [];
+  try {
+    const wp = await tmdb(`tv/${id}/watch/providers`);
+    const es = wp.results?.ES;
+    const list = [
+      ...(es?.flatrate || []),
+      ...(es?.rent || []),
+      ...(es?.buy || []),
+    ];
+    const uniq = new Map();
+    for (const p of list) {
+      if (!p?.provider_id) continue;
+      uniq.set(p.provider_id, p.provider_name || `Provider ${p.provider_id}`);
+    }
+    platforms = [...uniq.values()].slice(0, 6);
+  } catch {}
+
+  return {
+    titleEs: d.name || null,
+    titleOriginal: d.original_name || null,
+    releaseES,
+    platforms,
+  };
+}
 
 // ---------------------- FilmAffinity Scraper (no oficial) ----------------------
 const FA_HEADERS = {
@@ -64,7 +132,6 @@ async function faFindTitleUrl(query) {
 
   const $ = cheerio.load(html);
 
-  // Intenta localizar enlaces a fichas filmXXXXXX.html
   const links = [];
   $("a").each((_, a) => {
     const href = $(a).attr("href");
@@ -89,7 +156,7 @@ async function faGetRatingFromTitlePage(faUrl) {
     if (Number.isFinite(v)) rating = v;
   }
 
-  // 2) fallback: buscar un patrón tipo 7,3 o 7.3 en elementos "rating"
+  // 2) fallback: buscar algo tipo 7,3 o 7.3
   if (rating == null) {
     const txt = $('[class*="rating"]').first().text();
     const m = txt && txt.match(/(\d{1,2}[.,]\d)/);
@@ -99,7 +166,7 @@ async function faGetRatingFromTitlePage(faUrl) {
     }
   }
 
-  // votos (opcional)
+  // votos opcional
   let votes = null;
   const votesMeta = $('meta[itemprop="ratingCount"]').attr("content");
   if (votesMeta) {
@@ -110,17 +177,27 @@ async function faGetRatingFromTitlePage(faUrl) {
   return { fa: rating, faVotes: votes };
 }
 
-async function getFARating({ title, year }) {
-  // Para afinar búsquedas: "Title 2026"
-  const q = year ? `${title} ${year}` : title;
+// ✅ clave: probar título ES y original
+async function getFARating({ titleEs, titleOriginal, year }) {
+  const queries = [
+    year ? `${titleEs} ${year}` : titleEs,
+    titleEs,
+    year ? `${titleOriginal} ${year}` : titleOriginal,
+    titleOriginal,
+  ].filter(Boolean);
 
-  await sleep(350);
-  const faUrl = await faFindTitleUrl(q);
-  if (!faUrl) return { fa: null, faUrl: null, faVotes: null };
+  for (const q of queries) {
+    await sleep(350);
+    const faUrl = await faFindTitleUrl(q);
+    if (!faUrl) continue;
 
-  await sleep(350);
-  const { fa, faVotes } = await faGetRatingFromTitlePage(faUrl);
-  return { fa, faUrl, faVotes };
+    await sleep(350);
+    const { fa, faVotes } = await faGetRatingFromTitlePage(faUrl);
+    if (typeof fa === "number" && fa >= 1) {
+      return { fa, faUrl, faVotes, matchedQuery: q };
+    }
+  }
+  return { fa: null, faUrl: null, faVotes: null, matchedQuery: null };
 }
 
 // ---------------------- Scoring ----------------------
@@ -163,7 +240,6 @@ function coverage(x) {
   return `${have}/6`;
 }
 
-// Para que SIEMPRE haya top5 aunque falte IMDb/FA, usamos fallback con TMDb
 const pickTop = (items, n = 5) =>
   items
     .filter(
@@ -195,7 +271,7 @@ const buildMoviesES = async () => {
     page: "1",
   });
 
-  const results = page1.results?.slice(0, 18) ?? []; // limitado para no scrapear demasiado
+  const results = page1.results?.slice(0, 16) ?? []; // limitar scraping
   const enriched = [];
 
   for (const m of results) {
@@ -203,14 +279,21 @@ const buildMoviesES = async () => {
     const imdbId = ext.imdb_id;
 
     const imdb = await omdbByImdbId(imdbId);
+    const es = await getMovieESDetails(m.id);
+    const year = (es.releaseES || m.release_date || "").slice(0, 4) || null;
 
-    const year = (m.release_date || "").slice(0, 4) || null;
-    const { fa } = await getFARating({ title: m.title, year });
+    const { fa } = await getFARating({
+      titleEs: es.titleEs || m.title,
+      titleOriginal: es.titleOriginal || null,
+      year,
+    });
 
-    // RT/MC: mañana los añadimos (de momento null)
     const item = {
-      title: m.title,
-      where: "España (estreno reciente)",
+      title: es.titleEs || m.title,
+      titleOriginal: es.titleOriginal || null,
+      releaseES: es.releaseES || null,
+      platforms: es.platforms || [],
+      where: es.platforms?.length ? es.platforms.join(" · ") : "España",
       fa,
       imdb,
       rtCrit: null,
@@ -243,7 +326,7 @@ const buildSeries = async () => {
     page: "1",
   });
 
-  const results = page1.results?.slice(0, 18) ?? [];
+  const results = page1.results?.slice(0, 16) ?? [];
   const enriched = [];
 
   for (const s of results) {
@@ -251,13 +334,21 @@ const buildSeries = async () => {
     const imdbId = ext.imdb_id;
 
     const imdb = await omdbByImdbId(imdbId);
+    const es = await getSeriesESDetails(s.id);
+    const year = (es.releaseES || s.first_air_date || "").slice(0, 4) || null;
 
-    const year = (s.first_air_date || "").slice(0, 4) || null;
-    const { fa } = await getFARating({ title: s.name, year });
+    const { fa } = await getFARating({
+      titleEs: es.titleEs || s.name,
+      titleOriginal: es.titleOriginal || null,
+      year,
+    });
 
     const item = {
-      title: s.name,
-      where: "Estreno/temporada reciente",
+      title: es.titleEs || s.name,
+      titleOriginal: es.titleOriginal || null,
+      releaseES: es.releaseES || null,
+      platforms: es.platforms || [],
+      where: es.platforms?.length ? es.platforms.join(" · ") : "España",
       fa,
       imdb,
       rtCrit: null,
