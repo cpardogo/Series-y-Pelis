@@ -3,32 +3,6 @@
   "movies": [
     {
       "rank": 1,
-      "title": "One Mile",
-      "titleTmdbEs": "One Mile: Chapter One",
-      "faTitle": "One Mile",
-      "faUrl": "https://www.filmaffinity.com/es/film523138.html",
-      "imdbUrl": "https://www.imdb.com/title/tt24326458/",
-      "releaseES": "2026-02-20",
-      "platforms": [],
-      "inCinemasES": false,
-      "where": "España",
-      "genres": [
-        "Acción",
-        "Crimen"
-      ],
-      "fa": null,
-      "imdb": null,
-      "rtCrit": null,
-      "rtAud": null,
-      "mcCrit": null,
-      "mcUser": null,
-      "tmdb": 7.7,
-      "imdbId": "tt24326458",
-      "final": 7.7,
-      "coverage": "0/6"
-    },
-    {
-      "rank": 2,
       "title": "28 años después",
       "titleTmdbEs": "28 años después: El templo de los huesos",
       "faTitle": "28 años después",
@@ -55,7 +29,7 @@
       "coverage": "2/6"
     },
     {
-      "rank": 3,
+      "rank": 2,
       "title": "Ruta de escape",
       "titleTmdbEs": "Ruta de escape",
       "faTitle": "Ruta de escape",
@@ -81,32 +55,7 @@
       "coverage": "2/6"
     },
     {
-      "rank": 4,
-      "title": "The Dreadful",
-      "titleTmdbEs": "The Dreadful",
-      "faTitle": "The Dreadful",
-      "faUrl": "https://www.filmaffinity.com/es/film396411.html",
-      "imdbUrl": "https://www.imdb.com/title/tt30842022/",
-      "releaseES": "2026-02-20",
-      "platforms": [],
-      "inCinemasES": false,
-      "where": "España",
-      "genres": [
-        "Terror"
-      ],
-      "fa": null,
-      "imdb": null,
-      "rtCrit": null,
-      "rtAud": null,
-      "mcCrit": null,
-      "mcUser": null,
-      "tmdb": 6.6,
-      "imdbId": "tt30842022",
-      "final": 6.6,
-      "coverage": "0/6"
-    },
-    {
-      "rank": 5,
+      "rank": 3,
       "title": "Climax",
       "titleTmdbEs": "Shelter: El Protector",
       "faTitle": "Climax",
@@ -130,6 +79,64 @@
       "tmdb": 7.3,
       "imdbId": "tt32357218",
       "final": 6.5,
+      "coverage": "2/6"
+    },
+    {
+      "rank": 4,
+      "title": "Man 2020 CortometrajeAnimación",
+      "titleTmdbEs": "GOAT: Como cabras",
+      "faTitle": "Man 2020 CortometrajeAnimación",
+      "faUrl": "https://www.filmaffinity.com/es/film389246.html",
+      "imdbUrl": "https://www.imdb.com/title/tt27613895/",
+      "releaseES": "2026-02-13",
+      "platforms": [],
+      "inCinemasES": true,
+      "where": "Cines",
+      "genres": [
+        "Animación",
+        "Comedia",
+        "Familia",
+        "Acción"
+      ],
+      "fa": 6,
+      "imdb": 6.9,
+      "rtCrit": null,
+      "rtAud": null,
+      "mcCrit": null,
+      "mcUser": null,
+      "tmdb": 7.4,
+      "imdbId": "tt27613895",
+      "final": 6.45,
+      "coverage": "2/6"
+    },
+    {
+      "rank": 5,
+      "title": "El botín",
+      "titleTmdbEs": "El botín",
+      "faTitle": "El botín",
+      "faUrl": "https://www.filmaffinity.com/es/film132617.html",
+      "imdbUrl": "https://www.imdb.com/title/tt32642706/",
+      "releaseES": "2026-01-16",
+      "platforms": [
+        "Netflix",
+        "Netflix Standard with Ads"
+      ],
+      "inCinemasES": false,
+      "where": "Netflix · Netflix Standard with Ads",
+      "genres": [
+        "Acción",
+        "Suspense",
+        "Crimen"
+      ],
+      "fa": 6.1,
+      "imdb": 6.8,
+      "rtCrit": null,
+      "rtAud": null,
+      "mcCrit": null,
+      "mcUser": null,
+      "tmdb": 7.1,
+      "imdbId": "tt32642706",
+      "final": 6.45,
       "coverage": "2/6"
     }
   ],
@@ -197,35 +204,6 @@
     },
     {
       "rank": 3,
-      "title": "El Mochaorejas Serie",
-      "titleTmdbEs": "El Mochaorejas",
-      "faTitle": "El Mochaorejas Serie",
-      "faUrl": "https://www.filmaffinity.com/es/film901574.html",
-      "imdbUrl": "https://www.imdb.com/title/tt39395780/",
-      "releaseES": "2026-01-23",
-      "platforms": [
-        "Atres Player",
-        "Amazon Prime Video"
-      ],
-      "inCinemasES": false,
-      "where": "Atres Player · Amazon Prime Video",
-      "genres": [
-        "Drama",
-        "Crimen"
-      ],
-      "fa": null,
-      "imdb": null,
-      "rtCrit": null,
-      "rtAud": null,
-      "mcCrit": null,
-      "mcUser": null,
-      "tmdb": 7.7,
-      "imdbId": "tt39395780",
-      "final": 7.7,
-      "coverage": "0/6"
-    },
-    {
-      "rank": 4,
       "title": "Niños de plomo Miniserie",
       "titleTmdbEs": "Niños de plomo",
       "faTitle": "Niños de plomo Miniserie",
@@ -242,7 +220,7 @@
         "Drama",
         "War & Politics"
       ],
-      "fa": 6.5,
+      "fa": 6.6,
       "imdb": 7.6,
       "rtCrit": null,
       "rtAud": null,
@@ -250,11 +228,11 @@
       "mcUser": null,
       "tmdb": 8.5,
       "imdbId": "tt33322230",
-      "final": 7.05,
+      "final": 7.1,
       "coverage": "2/6"
     },
     {
-      "rank": 5,
+      "rank": 4,
       "title": "Jack-of-All-Trades, Party of None SerieAnimación",
       "titleTmdbEs": "Jack-of-All-Trades, Party of None",
       "faTitle": "Jack-of-All-Trades, Party of None SerieAnimación",
@@ -282,6 +260,34 @@
       "imdbId": "tt38648925",
       "final": 7,
       "coverage": "1/6"
+    },
+    {
+      "rank": 5,
+      "title": "Wonder Man Miniserie",
+      "titleTmdbEs": "Wonder Man",
+      "faTitle": "Wonder Man Miniserie",
+      "faUrl": "https://www.filmaffinity.com/es/film988559.html",
+      "imdbUrl": "https://www.imdb.com/title/tt21066182/",
+      "releaseES": "2026-01-27",
+      "platforms": [
+        "Disney Plus"
+      ],
+      "inCinemasES": false,
+      "where": "Disney Plus",
+      "genres": [
+        "Comedia",
+        "Drama"
+      ],
+      "fa": 6.4,
+      "imdb": 7.6,
+      "rtCrit": null,
+      "rtAud": null,
+      "mcCrit": null,
+      "mcUser": null,
+      "tmdb": 7.1,
+      "imdbId": "tt21066182",
+      "final": 7,
+      "coverage": "2/6"
     }
   ]
 }
