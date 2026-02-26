@@ -123,7 +123,7 @@
       display:none;
     }
 
-    /* ===== Destacadas (DISEÑO ANTERIOR) ===== */
+    /* ===== Destacadas (diseño anterior) ===== */
     .featured{
       border:1px solid var(--border);
       border-radius: var(--radius);
@@ -145,7 +145,53 @@
     .featItem .t b{font-size:13px}
     .featItem a{color:inherit;text-decoration:none}
     .featItem a:hover{text-decoration:underline}
-    /* ======================================= */
+
+    /* ===== Histórico UI ===== */
+    .history{
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
+      box-shadow: var(--shadow);
+      padding:14px;
+      margin-top:14px;
+    }
+    .historyTop{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      justify-content:space-between;
+      flex-wrap:wrap;
+      margin-bottom:10px;
+    }
+    .historyTop h2{
+      margin:0;
+      font-size:15px;
+    }
+    .historyTop .hint{
+      color:var(--muted);
+      font-size:12px;
+      margin-top:3px;
+    }
+    .select{
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+    select{
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:8px 10px;
+      font-size:13px;
+      outline:none;
+    }
+    .mini{
+      font-size:12px;
+      color:var(--muted);
+    }
 
     @media (min-width: 900px){
       .card.half{grid-column: span 6;}
@@ -169,6 +215,53 @@
   <main class="wrap">
     <div id="err" class="err"></div>
 
+    <!-- HISTÓRICO -->
+    <section class="history" id="historyBox">
+      <div class="historyTop">
+        <div>
+          <h2>📚 Histórico</h2>
+          <div class="hint">Elige una fecha para ver el Top 5 de esa semana (desde <code>data/history</code>).</div>
+        </div>
+        <div class="select">
+          <span class="mini">Fecha:</span>
+          <select id="historySelect" disabled>
+            <option value="">Cargando…</option>
+          </select>
+          <span class="mini" id="historyStatus">—</span>
+        </div>
+      </div>
+
+      <div class="featured" id="historyFeatured" style="display:none">
+        <h3>✨ Destacadas (histórico)</h3>
+        <div class="featuredGrid" id="historyFeaturedGrid"></div>
+      </div>
+
+      <div class="grid" style="margin-top:12px">
+        <section class="card half">
+          <div class="hd">
+            <div>
+              <h2>🎬 Películas · Top 5 (histórico)</h2>
+              <div class="meta" id="historyMoviesMeta">—</div>
+            </div>
+            <span class="pill">Histórico</span>
+          </div>
+          <div class="list" id="historyMoviesList"></div>
+        </section>
+
+        <section class="card half">
+          <div class="hd">
+            <div>
+              <h2>📺 Series · Top 5 (histórico)</h2>
+              <div class="meta" id="historySeriesMeta">—</div>
+            </div>
+            <span class="pill">Histórico</span>
+          </div>
+          <div class="list" id="historySeriesList"></div>
+        </section>
+      </div>
+    </section>
+
+    <!-- ACTUAL -->
     <div class="featured" id="featured" style="display:none">
       <h3>✨ Destacadas de la semana</h3>
       <div class="featuredGrid" id="featuredGrid"></div>
@@ -203,42 +296,42 @@
     function esc(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
     function badge(text, cls=""){ return `<span class="badge ${cls}">${esc(text)}</span>`; }
 
-    // ---- Cobertura: parsea "2/6" -> {num:2, den:6}. Acepta "0", 0, null.
-    function parseCoverage(cov){
-      if(cov == null) return { num: null, den: null };
-      if(typeof cov === "number") return { num: cov, den: null };
+    // Cobertura válida SOLO si existe y num > 0. Acepta "2/6", "1/4"
+    function parseCoverageStrict(cov){
+      if(cov == null) return null;
       const s = String(cov).trim();
+      if(!s || s === "—") return null;
       const m = s.match(/^(\d+)\s*\/\s*(\d+)$/);
-      if(m) return { num: Number(m[1]), den: Number(m[2]) };
+      if(m){
+        const num = Number(m[1]);
+        const den = Number(m[2]);
+        if(!Number.isFinite(num) || !Number.isFinite(den) || den <= 0) return null;
+        return { num, den };
+      }
       const n = Number(s);
       if(Number.isFinite(n)) return { num: n, den: null };
-      return { num: null, den: null };
+      return null;
+    }
+    function hasValidCoverage(item){
+      const c = parseCoverageStrict(item?.coverage);
+      return !!c && c.num > 0;
     }
 
-    // ---- Excluir items con cobertura 0 (ej. "0/6", "0/8", 0, "0")
-    function hasZeroCoverage(item){
-      const { num, den } = parseCoverage(item?.coverage);
-      if(num == null) return false;            // si no sabemos, NO lo excluimos
-      if(den == null) return num <= 0;         // "0" o 0 => fuera
-      return num <= 0;                         // "0/6" => fuera
-    }
-
-    // ---- Score final seguro (si no hay final, usa -Inf para ir al final)
     function finalScore(item){
       return (typeof item?.final === "number") ? item.final : -Infinity;
     }
 
-    // ---- Prepara ranking: filtra cobertura 0 y ordena por final desc
     function prepareRanking(arr){
       const clean = (Array.isArray(arr) ? arr : [])
         .filter(Boolean)
-        .filter(x => !hasZeroCoverage(x)); // <-- AQUÍ se excluye 0/6
+        .filter(hasValidCoverage);
 
       clean.sort((a,b) => finalScore(b) - finalScore(a));
+      clean.forEach((x,i) => x.rank = i + 1);
       return clean;
     }
 
-    function rowHTML(item, idx){
+    function rowHTML(item){
       const platformsArr = Array.isArray(item.platforms) ? item.platforms.filter(Boolean) : [];
       const platforms = platformsArr.map(p => badge(p)).join("") || badge(item.where || "España");
       const cines = item.inCinemasES ? badge("Cines", "cines") : "";
@@ -258,7 +351,7 @@
 
       return `
         <div class="row">
-          <div class="rank">${idx + 1}</div>
+          <div class="rank">${item.rank ?? ""}</div>
           <div class="title">
             <b>${titleHTML}</b>
             <div class="platforms">${cines}${platforms}${release}</div>
@@ -272,7 +365,6 @@
       `;
     }
 
-    // ---- Destacada (diseño anterior): TÍTULO UNA VEZ (con link)
     function featuredCard(label, x){
       if(!x) return "";
       const href = x.faUrl || x.imdbUrl || "#";
@@ -296,51 +388,61 @@
       `;
     }
 
-    async function load(){
+    // --------- Render helpers ----------
+    function renderSection(data, opts){
+      const moviesRanked = prepareRanking(data?.movies);
+      const seriesRanked = prepareRanking(data?.series);
+
+      const moviesTop = moviesRanked.slice(0, 5);
+      const seriesTop = seriesRanked.slice(0, 5);
+
+      document.getElementById(opts.updatedAtId).textContent = data?.updatedAt || "—";
+
+      document.getElementById(opts.moviesListId).innerHTML =
+        moviesTop.length
+          ? moviesTop.map(rowHTML).join("")
+          : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay películas con cobertura</span></div><div></div></div>`;
+
+      document.getElementById(opts.seriesListId).innerHTML =
+        seriesTop.length
+          ? seriesTop.map(rowHTML).join("")
+          : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay series con cobertura</span></div><div></div></div>`;
+
+      const featuredBox = document.getElementById(opts.featuredBoxId);
+      const featuredGrid = document.getElementById(opts.featuredGridId);
+
+      const topMovie = moviesTop[0];
+      const topSerie = seriesTop[0];
+
+      if (topMovie || topSerie){
+        featuredBox.style.display = "block";
+        featuredGrid.innerHTML = [
+          featuredCard("🎬 #1 Película", topMovie),
+          featuredCard("📺 #1 Serie", topSerie)
+        ].join("");
+      } else {
+        featuredBox.style.display = "none";
+      }
+
+      if(opts.moviesMetaId) document.getElementById(opts.moviesMetaId).textContent = data?.updatedAt ? `Fecha: ${data.updatedAt}` : "—";
+      if(opts.seriesMetaId) document.getElementById(opts.seriesMetaId).textContent = data?.updatedAt ? `Fecha: ${data.updatedAt}` : "—";
+    }
+
+    // --------- Load current ----------
+    async function loadCurrent(){
       const err = document.getElementById("err");
       try{
         const r = await fetch("./data/latest.json?ts=" + Date.now(), { cache:"no-store" });
         if(!r.ok) throw new Error("No puedo cargar data/latest.json (HTTP " + r.status + ")");
         const data = await r.json();
 
-        document.getElementById("updatedAt").textContent = data.updatedAt || "—";
-
-        // 1) Filtra cobertura 0/6 y ordena por final desc
-        const moviesAll = Array.isArray(data.movies) ? data.movies : [];
-        const seriesAll = Array.isArray(data.series) ? data.series : [];
-
-        const moviesRanked = prepareRanking(moviesAll);
-        const seriesRanked = prepareRanking(seriesAll);
-
-        // 2) Top 5 ya “limpio”
-        const moviesTop = moviesRanked.slice(0, 5);
-        const seriesTop = seriesRanked.slice(0, 5);
-
-        document.getElementById("moviesList").innerHTML =
-          moviesTop.length
-            ? moviesTop.map((x,i) => rowHTML(x,i)).join("")
-            : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay títulos con cobertura &gt; 0</span></div><div></div></div>`;
-
-        document.getElementById("seriesList").innerHTML =
-          seriesTop.length
-            ? seriesTop.map((x,i) => rowHTML(x,i)).join("")
-            : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay títulos con cobertura &gt; 0</span></div><div></div></div>`;
-
-        // 3) Destacadas = #1 de cada ranking (ya filtrado)
-        const featured = document.getElementById("featured");
-        const featuredGrid = document.getElementById("featuredGrid");
-        const topMovie = moviesTop[0];
-        const topSerie = seriesTop[0];
-
-        if (topMovie || topSerie){
-          featured.style.display = "block";
-          featuredGrid.innerHTML = [
-            featuredCard("🎬 #1 Película", topMovie),
-            featuredCard("📺 #1 Serie", topSerie)
-          ].join("");
-        } else {
-          featured.style.display = "none";
-        }
+        renderSection(data, {
+          updatedAtId: "updatedAt",
+          moviesListId: "moviesList",
+          seriesListId: "seriesList",
+          featuredBoxId: "featured",
+          featuredGridId: "featuredGrid"
+        });
 
       } catch(e){
         err.style.display = "block";
@@ -351,7 +453,74 @@
       }
     }
 
-    load();
+    // --------- Load history list + selected date ----------
+    async function loadHistoryIndex(){
+      const sel = document.getElementById("historySelect");
+      const status = document.getElementById("historyStatus");
+      try{
+        const r = await fetch("./data/history/index.json?ts=" + Date.now(), { cache:"no-store" });
+        if(!r.ok) throw new Error("No puedo cargar data/history/index.json (HTTP " + r.status + ")");
+        const dates = await r.json();
+        if(!Array.isArray(dates) || !dates.length) throw new Error("index.json vacío");
+
+        // Más recientes arriba
+        const sorted = [...dates].sort().reverse();
+
+        sel.innerHTML = sorted.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join("");
+        sel.disabled = false;
+
+        status.textContent = `${sorted.length} fechas`;
+
+        // autoload más reciente
+        await loadHistoryDate(sorted[0]);
+
+        sel.addEventListener("change", async () => {
+          if(sel.value) await loadHistoryDate(sel.value);
+        });
+
+      } catch(e){
+        status.textContent = "Histórico no disponible";
+        sel.disabled = true;
+        sel.innerHTML = `<option value="">No disponible</option>`;
+        document.getElementById("historyFeatured").style.display = "none";
+        document.getElementById("historyMoviesList").innerHTML =
+          `<div class="row"><div></div><div class="title"><b>Sin histórico</b><span>${esc(e.message)}</span></div><div></div></div>`;
+        document.getElementById("historySeriesList").innerHTML = "";
+      }
+    }
+
+    async function loadHistoryDate(date){
+      const status = document.getElementById("historyStatus");
+      status.textContent = `Cargando ${date}…`;
+      try{
+        const r = await fetch(`./data/history/${date}.json?ts=` + Date.now(), { cache:"no-store" });
+        if(!r.ok) throw new Error(`No puedo cargar data/history/${date}.json (HTTP ${r.status})`);
+        const data = await r.json();
+
+        renderSection(data, {
+          updatedAtId: "historyStatus",          // aquí mostramos la fecha cargada
+          moviesListId: "historyMoviesList",
+          seriesListId: "historySeriesList",
+          featuredBoxId: "historyFeatured",
+          featuredGridId: "historyFeaturedGrid",
+          moviesMetaId: "historyMoviesMeta",
+          seriesMetaId: "historySeriesMeta"
+        });
+
+        // Ajuste: historyStatus debe mostrar texto humano
+        document.getElementById("historyStatus").textContent = `Mostrando ${data?.updatedAt || date}`;
+
+      } catch(e){
+        status.textContent = "Error";
+        document.getElementById("historyFeatured").style.display = "none";
+        document.getElementById("historyMoviesList").innerHTML =
+          `<div class="row"><div></div><div class="title"><b>Error histórico</b><span>${esc(e.message)}</span></div><div></div></div>`;
+        document.getElementById("historySeriesList").innerHTML = "";
+      }
+    }
+
+    loadCurrent();
+    loadHistoryIndex();
   </script>
 </body>
 </html>
