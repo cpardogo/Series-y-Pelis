@@ -49,11 +49,14 @@ function whereString({ platforms, inCinemasES }) {
   return "España";
 }
 
+function todayISO() {
+  return new Date().toISOString().slice(0, 10);
+}
+
 // ---------------- TMDb: título ES + estreno ES + providers ES + géneros ----------------
 async function getMovieESDetails(id) {
   const d = await tmdb(`movie/${id}`, { language: "es-ES" });
 
-  // Estreno ES + flag "cines"
   let releaseES = d.release_date || null;
   let inCinemasES = false;
 
@@ -63,10 +66,9 @@ async function getMovieESDetails(id) {
     const rds = es?.release_dates || [];
     const date = rds?.[0]?.release_date;
     if (date) releaseES = date.slice(0, 10);
-    if (rds.some((x) => x?.type === 3 || x?.type === 2)) inCinemasES = true; // theatrical/limited
+    if (rds.some((x) => x?.type === 3 || x?.type === 2)) inCinemasES = true;
   } catch {}
 
-  // Providers ES (flatrate/rent/buy/free/ads)
   let platforms = [];
   try {
     const wp = await tmdb(`movie/${id}/watch/providers`);
@@ -86,7 +88,6 @@ async function getMovieESDetails(id) {
     platforms = [...uniq.values()].slice(0, 8);
   } catch {}
 
-  // Géneros ES
   const genres = Array.isArray(d.genres) ? d.genres.map((g) => g.name).filter(Boolean) : [];
 
   return {
@@ -104,7 +105,6 @@ async function getSeriesESDetails(id) {
 
   const releaseES = d.first_air_date || null;
 
-  // Providers ES
   let platforms = [];
   try {
     const wp = await tmdb(`tv/${id}/watch/providers`);
@@ -124,7 +124,6 @@ async function getSeriesESDetails(id) {
     platforms = [...uniq.values()].slice(0, 8);
   } catch {}
 
-  // Géneros ES
   const genres = Array.isArray(d.genres) ? d.genres.map((g) => g.name).filter(Boolean) : [];
 
   return {
@@ -156,13 +155,37 @@ function normalizeFAUrl(href) {
   return `https://www.filmaffinity.com/es/${href}`;
 }
 
-async function faFindTitleUrl(query) {
+// --- Similaridad muy simple y efectiva: títulos normalizados por tokens
+function normForMatch(s) {
+  return String(s ?? "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenSet(s) {
+  return new Set(normForMatch(s).split(" ").filter(Boolean));
+}
+
+function jaccard(a, b) {
+  const A = tokenSet(a);
+  const B = tokenSet(b);
+  if (!A.size || !B.size) return 0;
+  let inter = 0;
+  for (const t of A) if (B.has(t)) inter++;
+  const union = A.size + B.size - inter;
+  return union ? inter / union : 0;
+}
+
+// Devuelve candidatos (hasta N) en vez de solo el primero
+async function faFindTitleUrls(query, limit = 6) {
   const url = new URL("https://www.filmaffinity.com/es/search.php");
   url.searchParams.set("stext", query);
   url.searchParams.set("stype", "all");
 
   const html = await faFetch(url.toString());
-  if (!html) return null;
+  if (!html) return [];
 
   const $ = cheerio.load(html);
   const links = [];
@@ -173,22 +196,25 @@ async function faFindTitleUrl(query) {
   });
 
   const uniq = [...new Set(links)].map(normalizeFAUrl).filter(Boolean);
-  return uniq.length ? uniq[0] : null;
+  return uniq.slice(0, limit);
 }
 
 async function faGetRatingFromTitlePage(faUrl) {
   const html = await faFetch(faUrl);
-  if (!html) return { fa: null, faTitle: null };
+  if (!html) return { fa: null, faTitle: null, faYear: null };
 
   const $ = cheerio.load(html);
 
-  // título FA (prefer h1, fallback a <title>)
   const faTitle =
     cleanTitle($("h1").first().text()) ||
     cleanTitle($("title").first().text().replace(/\s*\|\s*FilmAffinity.*/i, "")) ||
     null;
 
-  // rating FA
+  // intenta sacar año del <title> si aparece (bastante común)
+  const t = $("title").first().text() || "";
+  const ym = t.match(/\b(19\d{2}|20\d{2})\b/);
+  const faYear = ym ? ym[1] : null;
+
   let rating = null;
   const meta = $('meta[itemprop="ratingValue"]').attr("content");
   if (meta) {
@@ -205,11 +231,12 @@ async function faGetRatingFromTitlePage(faUrl) {
     }
   }
 
-  return { fa: rating, faTitle };
+  return { fa: rating, faTitle, faYear };
 }
 
 const faCache = new Map();
 
+// Escoge el mejor candidato por similitud de título + bonus por año
 async function getFARating({ titleEs, titleOriginal, year }) {
   const es = cleanTitle(titleEs);
   const orig = cleanTitle(titleOriginal);
@@ -221,29 +248,51 @@ async function getFARating({ titleEs, titleOriginal, year }) {
     orig,
   ].filter(Boolean);
 
+  const targetTitle = es || orig;
+  const targetYear = year ? String(year) : null;
+
   for (const q of queries) {
     if (faCache.has(q)) return faCache.get(q);
 
     await sleep(250);
-    const faUrl = await faFindTitleUrl(q);
-    if (!faUrl) {
+    const candidates = await faFindTitleUrls(q, 6);
+    if (!candidates.length) {
       const res = { fa: null, faUrl: null, faTitle: null };
       faCache.set(q, res);
       continue;
     }
 
-    await sleep(250);
-    const { fa, faTitle } = await faGetRatingFromTitlePage(faUrl);
+    // Evaluamos candidatos
+    let best = { score: -1, fa: null, faUrl: null, faTitle: null };
 
-    const res = {
-      fa: typeof fa === "number" ? fa : null,
-      faUrl,
-      faTitle: faTitle || null,
-    };
+    for (const url of candidates) {
+      await sleep(250);
+      const { fa, faTitle, faYear } = await faGetRatingFromTitlePage(url);
+
+      const sim = targetTitle && faTitle ? jaccard(targetTitle, faTitle) : 0;
+      const yearBonus =
+        targetYear && faYear && targetYear === String(faYear) ? 0.25 : 0;
+
+      const total = sim + yearBonus;
+
+      if (total > best.score) {
+        best = {
+          score: total,
+          fa: typeof fa === "number" ? fa : null,
+          faUrl: url,
+          faTitle: faTitle || null,
+        };
+      }
+    }
+
+    // Umbral: si no parece match, lo descartamos
+    const res =
+      best.score >= 0.35
+        ? { fa: best.fa, faUrl: best.faUrl, faTitle: best.faTitle }
+        : { fa: null, faUrl: null, faTitle: null };
 
     faCache.set(q, res);
 
-    // si al menos tenemos título o nota, ya nos vale
     if (res.fa != null || res.faTitle != null) return res;
   }
 
@@ -280,10 +329,6 @@ function coverage(x) {
   return `${have}/6`;
 }
 
-/**
- * Devuelve TRUE si coverage es > 0/6
- * - coverage siempre es string tipo "2/6"
- */
 function hasCoverage(item) {
   const c = String(item?.coverage ?? "").trim();
   const m = c.match(/^(\d+)\s*\/\s*(\d+)$/);
@@ -292,13 +337,9 @@ function hasCoverage(item) {
   return Number.isFinite(have) && have > 0;
 }
 
-/**
- * Top N solo con cobertura (>0/6)
- * - Orden: final -> imdb -> fa (no tmdb si coverage es 0/6 porque ya se filtró)
- */
 const pickTop = (items, n = 5) =>
   items
-    .filter((x) => x && hasCoverage(x)) // ✅ elimina 0/6 y sin cobertura
+    .filter((x) => x && hasCoverage(x))
     .sort((a, b) => (b.final ?? b.imdb ?? b.fa ?? 0) - (a.final ?? a.imdb ?? a.fa ?? 0))
     .slice(0, n)
     .map((x, idx) => ({ rank: idx + 1, ...x }));
@@ -324,7 +365,6 @@ const buildMoviesES = async () => {
   for (const m of results) {
     const es = await getMovieESDetails(m.id);
 
-    // Solo si tiene presencia ES: estreno ES o plataformas ES o cines ES
     const hasES = !!es.releaseES || (es.platforms && es.platforms.length) || es.inCinemasES;
     if (!hasES) continue;
 
@@ -340,7 +380,7 @@ const buildMoviesES = async () => {
     });
 
     const item = {
-      title: faTitle || (es.titleEs || m.title),        // ✅ título como en FA si existe
+      title: faTitle || (es.titleEs || m.title),
       titleTmdbEs: es.titleEs || m.title,
       faTitle: faTitle || null,
       faUrl: faUrl || null,
@@ -364,11 +404,9 @@ const buildMoviesES = async () => {
       imdbId,
     };
 
-    // final: SOLO basado en fuentes (FA/IMDb/RT/MC); si no hay, queda null
     item.final = computeFinal(item) ?? item.imdb ?? item.fa ?? null;
     item.coverage = coverage(item);
 
-    // ✅ Elimina aquí mismo los 0/6 (ahorra ruido)
     if (!hasCoverage(item)) continue;
 
     enriched.push(item);
@@ -398,7 +436,6 @@ const buildSeriesES = async () => {
   for (const s of results) {
     const es = await getSeriesESDetails(s.id);
 
-    // Solo series con plataformas ES (para saber “dónde ver”)
     const hasESPlatforms = Array.isArray(es.platforms) && es.platforms.length > 0;
     if (!hasESPlatforms) continue;
 
@@ -438,11 +475,9 @@ const buildSeriesES = async () => {
       imdbId,
     };
 
-    // final: SOLO basado en fuentes (FA/IMDb/RT/MC); si no hay, queda null
     item.final = computeFinal(item) ?? item.imdb ?? item.fa ?? null;
     item.coverage = coverage(item);
 
-    // ✅ Elimina aquí mismo los 0/6
     if (!hasCoverage(item)) continue;
 
     enriched.push(item);
@@ -451,20 +486,40 @@ const buildSeriesES = async () => {
   return pickTop(enriched, 5);
 };
 
-// ---------------- main ----------------
+// ---------------- main (latest + histórico) ----------------
 const main = async () => {
   const movies = await buildMoviesES();
   const series = await buildSeriesES();
 
+  const date = todayISO();
   const payload = {
-    updatedAt: new Date().toISOString().slice(0, 10),
+    updatedAt: date,
     movies,
     series,
   };
 
   await fs.mkdir("data", { recursive: true });
+  await fs.mkdir("data/history", { recursive: true });
+
+  // latest
   await fs.writeFile("data/latest.json", JSON.stringify(payload, null, 2), "utf8");
-  console.log("Wrote data/latest.json");
+
+  // histórico (snapshot por fecha)
+  await fs.writeFile(`data/history/${date}.json`, JSON.stringify(payload, null, 2), "utf8");
+
+  // índice (lista de fechas disponibles) para futuro uso en UI
+  // (lo hacemos simple: añadimos la fecha si no existe)
+  const indexPath = "data/history/index.json";
+  let index = [];
+  try {
+    index = JSON.parse(await fs.readFile(indexPath, "utf8"));
+    if (!Array.isArray(index)) index = [];
+  } catch {}
+  if (!index.includes(date)) index.push(date);
+  index.sort(); // asc
+  await fs.writeFile(indexPath, JSON.stringify(index, null, 2), "utf8");
+
+  console.log("Wrote data/latest.json and data/history/" + date + ".json");
 };
 
 main();
