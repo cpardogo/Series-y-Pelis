@@ -43,7 +43,7 @@
       font-size:12px; color:var(--text);
       text-decoration:none;
     }
-    .navlink:hover{ text-decoration:underline; }
+    .navlink:hover{text-decoration:underline}
 
     .grid{display:grid; grid-template-columns: repeat(12, 1fr); gap:14px; margin-top:18px}
     .card{
@@ -129,7 +129,7 @@
       display:none;
     }
 
-    /* ===== Destacadas (mismo diseño, + background sin romper) ===== */
+    /* ===== Destacadas (estructura intacta + mejora visual) ===== */
     .featured{
       border:1px solid var(--border);
       border-radius: var(--radius);
@@ -151,35 +151,66 @@
       overflow:hidden;
     }
 
-    /* capa background */
-    .featItem::before{
+    /* background sutil (solo si hay imagen) */
+    .featItem.hasBg::before{
       content:"";
       position:absolute;
       inset:0;
       background:
-        radial-gradient(900px 260px at 20% 10%, rgba(255,255,255,.14), transparent 60%),
-        linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.25));
-      opacity:.85;
-      pointer-events:none;
-    }
-
-    /* cuando hay imagen, se inyecta como CSS var --bgimg */
-    .featItem.hasBg::before{
-      background:
-        linear-gradient(90deg, rgba(0,0,0,.70), rgba(0,0,0,.20)),
+        linear-gradient(90deg, rgba(0,0,0,.72), rgba(0,0,0,.25)),
         linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.35)),
         var(--bgimg);
       background-size: cover;
       background-position: center;
       opacity: 1;
+      pointer-events:none;
       filter: saturate(1.05);
     }
 
-    /* contenido por encima */
-    .featItem .t{position:relative; display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+    .featItem .t{
+      position:relative;
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+    }
+
+    /* mini poster */
+    .featLeft{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      min-width:0;
+      flex: 1;
+    }
+    .featPoster{
+      width:52px;
+      height:78px;
+      border-radius:10px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      flex: 0 0 auto;
+    }
+    .featPoster img{
+      width:100%;
+      height:100%;
+      object-fit:cover;
+      display:block;
+    }
+    .featText{min-width:0;}
     .featItem .t b{font-size:13px}
     .featItem a{color:inherit;text-decoration:none}
     .featItem a:hover{text-decoration:underline}
+
+    /* un poquito más “premium” */
+    .featItem:hover{
+      border-color: rgba(255,255,255,.14);
+    }
+
+    @media (max-width: 520px){
+      .featPoster{ width:46px; height:70px; }
+    }
 
     @media (min-width: 900px){
       .card.half{grid-column: span 6;}
@@ -300,11 +331,13 @@
       `;
     }
 
-    function tmdbImgUrl(item){
-      const path = item?.backdropPath || item?.posterPath || null;
-      if(!path) return null;
-      // w780 es buen equilibrio; fallback a original si quieres más calidad
-      return `https://image.tmdb.org/t/p/w780${path}`;
+    function tmdbPosterUrl(item){
+      const p = item?.posterPath || null;
+      return p ? `https://image.tmdb.org/t/p/w342${p}` : null;
+    }
+    function tmdbBgUrl(item){
+      const p = item?.backdropPath || item?.posterPath || null;
+      return p ? `https://image.tmdb.org/t/p/w780${p}` : null;
     }
 
     function featuredCard(label, x){
@@ -314,19 +347,28 @@
       const g = Array.isArray(x.genres) && x.genres.length ? x.genres.slice(0,3).join(" / ") : "—";
       const c = x.inCinemasES ? "Cines · " : "";
       const final = (typeof x.final === "number") ? x.final.toFixed(2) : "—";
-      const bg = tmdbImgUrl(x);
 
-      const style = bg ? `style="--bgimg:url('${bg}')"` : "";
+      const poster = tmdbPosterUrl(x);
+      const bg = tmdbBgUrl(x);
+
       const cls = bg ? "featItem hasBg" : "featItem";
+      const style = bg ? `style="--bgimg:url('${bg}')"` : "";
+
+      const posterHTML = poster
+        ? `<div class="featPoster"><img src="${poster}" alt="" loading="lazy" decoding="async"></div>`
+        : `<div class="featPoster" aria-hidden="true"></div>`;
 
       return `
         <div class="${cls}" ${style}>
           <div class="t">
-            <div>
-              <div class="submeta">${esc(label)}</div>
-              <b><a href="${href}" target="_blank" rel="noopener noreferrer">${esc(x.title)} ↗</a></b>
-              <div class="submeta">${esc(c + p)}${x.releaseES ? " · ES: " + esc(x.releaseES) : ""}</div>
-              <div class="submeta">Género: ${esc(g)}</div>
+            <div class="featLeft">
+              ${posterHTML}
+              <div class="featText">
+                <div class="submeta">${esc(label)}</div>
+                <b><a href="${href}" target="_blank" rel="noopener noreferrer">${esc(x.title)} ↗</a></b>
+                <div class="submeta">${esc(c + p)}${x.releaseES ? " · ES: " + esc(x.releaseES) : ""}</div>
+                <div class="submeta">Género: ${esc(g)}</div>
+              </div>
             </div>
             <div class="pillScore">${final}</div>
           </div>
