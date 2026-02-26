@@ -129,7 +129,7 @@
       display:none;
     }
 
-    /* ===== Destacadas (estructura intacta + mejora visual) ===== */
+    /* ===== Destacadas (estructura intacta + poster + bg) ===== */
     .featured{
       border:1px solid var(--border);
       border-radius: var(--radius);
@@ -151,7 +151,6 @@
       overflow:hidden;
     }
 
-    /* background sutil (solo si hay imagen) */
     .featItem.hasBg::before{
       content:"";
       position:absolute;
@@ -162,9 +161,8 @@
         var(--bgimg);
       background-size: cover;
       background-position: center;
-      opacity: 1;
       pointer-events:none;
-      filter: saturate(1.05);
+      filter:saturate(1.05);
     }
 
     .featItem .t{
@@ -172,17 +170,17 @@
       display:flex;
       justify-content:space-between;
       gap:12px;
-      align-items:flex-start;
+      align-items:flex-start; /* ✅ clave para alinear pill arriba */
     }
 
-    /* mini poster */
     .featLeft{
       display:flex;
       gap:12px;
       align-items:flex-start;
       min-width:0;
-      flex: 1;
+      flex:1;
     }
+
     .featPoster{
       width:52px;
       height:78px;
@@ -190,26 +188,27 @@
       overflow:hidden;
       border:1px solid rgba(255,255,255,.12);
       background:rgba(255,255,255,.06);
-      flex: 0 0 auto;
+      flex:0 0 auto;
     }
-    .featPoster img{
-      width:100%;
-      height:100%;
-      object-fit:cover;
-      display:block;
-    }
+    .featPoster img{ width:100%; height:100%; object-fit:cover; display:block; }
+
     .featText{min-width:0;}
-    .featItem .t b{font-size:13px}
     .featItem a{color:inherit;text-decoration:none}
     .featItem a:hover{text-decoration:underline}
 
-    /* un poquito más “premium” */
-    .featItem:hover{
-      border-color: rgba(255,255,255,.14);
+    /* ✅ alinear score bien en móvil */
+    .featScore{
+      display:flex;
+      flex-direction:column;
+      align-items:flex-end;
+      gap:6px;
+      margin-left:auto;
     }
+    .featScore .pillScore{ min-width: 92px; }
 
     @media (max-width: 520px){
       .featPoster{ width:46px; height:70px; }
+      .featScore .pillScore{ min-width: 78px; } /* ✅ no desborda */
     }
 
     @media (min-width: 900px){
@@ -354,9 +353,10 @@
       const cls = bg ? "featItem hasBg" : "featItem";
       const style = bg ? `style="--bgimg:url('${bg}')"` : "";
 
+      // ✅ Si no hay poster, NO mostramos el marco vacío
       const posterHTML = poster
         ? `<div class="featPoster"><img src="${poster}" alt="" loading="lazy" decoding="async"></div>`
-        : `<div class="featPoster" aria-hidden="true"></div>`;
+        : ``;
 
       return `
         <div class="${cls}" ${style}>
@@ -370,7 +370,10 @@
                 <div class="submeta">Género: ${esc(g)}</div>
               </div>
             </div>
-            <div class="pillScore">${final}</div>
+            <div class="featScore">
+              <div class="pillScore">${final}</div>
+              <div class="submeta">${esc(x.coverage ? ("Cobertura " + x.coverage) : "")}</div>
+            </div>
           </div>
         </div>
       `;
