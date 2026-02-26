@@ -37,6 +37,13 @@
       background:rgba(255,255,255,.04);
       font-size:12px; color:var(--muted)
     }
+    .navlink{
+      padding:8px 10px; border:1px solid var(--border); border-radius:999px;
+      background:rgba(255,255,255,.04);
+      font-size:12px; color:var(--text);
+      text-decoration:none;
+    }
+    .navlink:hover{ text-decoration:underline; }
 
     .grid{display:grid; grid-template-columns: repeat(12, 1fr); gap:14px; margin-top:18px}
     .card{
@@ -80,7 +87,6 @@
     .title b{font-size:13px; line-height:1.25}
     .title b a{color:inherit;text-decoration:none}
     .title b a:hover{text-decoration:underline}
-    .title span{font-size:12px; color:var(--muted)}
 
     .platforms, .genres {display:flex; gap:6px; flex-wrap:wrap}
     .badge{
@@ -123,7 +129,7 @@
       display:none;
     }
 
-    /* ===== Destacadas (diseño anterior) ===== */
+    /* ===== Destacadas (mismo diseño, + background sin romper) ===== */
     .featured{
       border:1px solid var(--border);
       border-radius: var(--radius);
@@ -135,63 +141,45 @@
     .featured h3{margin:0 0 10px; font-size:14px}
     .featuredGrid{display:grid;grid-template-columns:1fr;gap:10px}
     @media (min-width: 900px){ .featuredGrid{grid-template-columns:1fr 1fr;} }
+
     .featItem{
+      position:relative;
       border:1px solid var(--border);
       background:rgba(255,255,255,.04);
       border-radius:14px;
       padding:12px;
+      overflow:hidden;
     }
-    .featItem .t{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+
+    /* capa background */
+    .featItem::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        radial-gradient(900px 260px at 20% 10%, rgba(255,255,255,.14), transparent 60%),
+        linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.25));
+      opacity:.85;
+      pointer-events:none;
+    }
+
+    /* cuando hay imagen, se inyecta como CSS var --bgimg */
+    .featItem.hasBg::before{
+      background:
+        linear-gradient(90deg, rgba(0,0,0,.70), rgba(0,0,0,.20)),
+        linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.35)),
+        var(--bgimg);
+      background-size: cover;
+      background-position: center;
+      opacity: 1;
+      filter: saturate(1.05);
+    }
+
+    /* contenido por encima */
+    .featItem .t{position:relative; display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
     .featItem .t b{font-size:13px}
     .featItem a{color:inherit;text-decoration:none}
     .featItem a:hover{text-decoration:underline}
-
-    /* ===== Histórico UI ===== */
-    .history{
-      border:1px solid var(--border);
-      border-radius: var(--radius);
-      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.02));
-      box-shadow: var(--shadow);
-      padding:14px;
-      margin-top:14px;
-    }
-    .historyTop{
-      display:flex;
-      gap:12px;
-      align-items:flex-start;
-      justify-content:space-between;
-      flex-wrap:wrap;
-      margin-bottom:10px;
-    }
-    .historyTop h2{
-      margin:0;
-      font-size:15px;
-    }
-    .historyTop .hint{
-      color:var(--muted);
-      font-size:12px;
-      margin-top:3px;
-    }
-    .select{
-      display:flex;
-      gap:8px;
-      align-items:center;
-      flex-wrap:wrap;
-      justify-content:flex-end;
-    }
-    select{
-      background:rgba(255,255,255,.04);
-      color:var(--text);
-      border:1px solid var(--border);
-      border-radius:12px;
-      padding:8px 10px;
-      font-size:13px;
-      outline:none;
-    }
-    .mini{
-      font-size:12px;
-      color:var(--muted);
-    }
 
     @media (min-width: 900px){
       .card.half{grid-column: span 6;}
@@ -207,6 +195,7 @@
         <div class="sub">Top 5 en España · título FA (si existe) · géneros · plataformas/cines · links a FA/IMDb</div>
       </div>
       <div class="chips">
+        <a class="navlink" href="./history.html">📚 Histórico</a>
         <div class="chip">Última actualización: <b id="updatedAt">—</b></div>
       </div>
     </div>
@@ -215,53 +204,6 @@
   <main class="wrap">
     <div id="err" class="err"></div>
 
-    <!-- HISTÓRICO -->
-    <section class="history" id="historyBox">
-      <div class="historyTop">
-        <div>
-          <h2>📚 Histórico</h2>
-          <div class="hint">Elige una fecha para ver el Top 5 de esa semana (desde <code>data/history</code>).</div>
-        </div>
-        <div class="select">
-          <span class="mini">Fecha:</span>
-          <select id="historySelect" disabled>
-            <option value="">Cargando…</option>
-          </select>
-          <span class="mini" id="historyStatus">—</span>
-        </div>
-      </div>
-
-      <div class="featured" id="historyFeatured" style="display:none">
-        <h3>✨ Destacadas (histórico)</h3>
-        <div class="featuredGrid" id="historyFeaturedGrid"></div>
-      </div>
-
-      <div class="grid" style="margin-top:12px">
-        <section class="card half">
-          <div class="hd">
-            <div>
-              <h2>🎬 Películas · Top 5 (histórico)</h2>
-              <div class="meta" id="historyMoviesMeta">—</div>
-            </div>
-            <span class="pill">Histórico</span>
-          </div>
-          <div class="list" id="historyMoviesList"></div>
-        </section>
-
-        <section class="card half">
-          <div class="hd">
-            <div>
-              <h2>📺 Series · Top 5 (histórico)</h2>
-              <div class="meta" id="historySeriesMeta">—</div>
-            </div>
-            <span class="pill">Histórico</span>
-          </div>
-          <div class="list" id="historySeriesList"></div>
-        </section>
-      </div>
-    </section>
-
-    <!-- ACTUAL -->
     <div class="featured" id="featured" style="display:none">
       <h3>✨ Destacadas de la semana</h3>
       <div class="featuredGrid" id="featuredGrid"></div>
@@ -296,15 +238,13 @@
     function esc(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
     function badge(text, cls=""){ return `<span class="badge ${cls}">${esc(text)}</span>`; }
 
-    // Cobertura válida SOLO si existe y num > 0. Acepta "2/6", "1/4"
     function parseCoverageStrict(cov){
       if(cov == null) return null;
       const s = String(cov).trim();
       if(!s || s === "—") return null;
       const m = s.match(/^(\d+)\s*\/\s*(\d+)$/);
       if(m){
-        const num = Number(m[1]);
-        const den = Number(m[2]);
+        const num = Number(m[1]), den = Number(m[2]);
         if(!Number.isFinite(num) || !Number.isFinite(den) || den <= 0) return null;
         return { num, den };
       }
@@ -316,16 +256,11 @@
       const c = parseCoverageStrict(item?.coverage);
       return !!c && c.num > 0;
     }
-
     function finalScore(item){
       return (typeof item?.final === "number") ? item.final : -Infinity;
     }
-
     function prepareRanking(arr){
-      const clean = (Array.isArray(arr) ? arr : [])
-        .filter(Boolean)
-        .filter(hasValidCoverage);
-
+      const clean = (Array.isArray(arr) ? arr : []).filter(Boolean).filter(hasValidCoverage);
       clean.sort((a,b) => finalScore(b) - finalScore(a));
       clean.forEach((x,i) => x.rank = i + 1);
       return clean;
@@ -365,6 +300,13 @@
       `;
     }
 
+    function tmdbImgUrl(item){
+      const path = item?.backdropPath || item?.posterPath || null;
+      if(!path) return null;
+      // w780 es buen equilibrio; fallback a original si quieres más calidad
+      return `https://image.tmdb.org/t/p/w780${path}`;
+    }
+
     function featuredCard(label, x){
       if(!x) return "";
       const href = x.faUrl || x.imdbUrl || "#";
@@ -372,9 +314,13 @@
       const g = Array.isArray(x.genres) && x.genres.length ? x.genres.slice(0,3).join(" / ") : "—";
       const c = x.inCinemasES ? "Cines · " : "";
       const final = (typeof x.final === "number") ? x.final.toFixed(2) : "—";
+      const bg = tmdbImgUrl(x);
+
+      const style = bg ? `style="--bgimg:url('${bg}')"` : "";
+      const cls = bg ? "featItem hasBg" : "featItem";
 
       return `
-        <div class="featItem">
+        <div class="${cls}" ${style}>
           <div class="t">
             <div>
               <div class="submeta">${esc(label)}</div>
@@ -388,61 +334,45 @@
       `;
     }
 
-    // --------- Render helpers ----------
-    function renderSection(data, opts){
-      const moviesRanked = prepareRanking(data?.movies);
-      const seriesRanked = prepareRanking(data?.series);
-
-      const moviesTop = moviesRanked.slice(0, 5);
-      const seriesTop = seriesRanked.slice(0, 5);
-
-      document.getElementById(opts.updatedAtId).textContent = data?.updatedAt || "—";
-
-      document.getElementById(opts.moviesListId).innerHTML =
-        moviesTop.length
-          ? moviesTop.map(rowHTML).join("")
-          : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay películas con cobertura</span></div><div></div></div>`;
-
-      document.getElementById(opts.seriesListId).innerHTML =
-        seriesTop.length
-          ? seriesTop.map(rowHTML).join("")
-          : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay series con cobertura</span></div><div></div></div>`;
-
-      const featuredBox = document.getElementById(opts.featuredBoxId);
-      const featuredGrid = document.getElementById(opts.featuredGridId);
-
-      const topMovie = moviesTop[0];
-      const topSerie = seriesTop[0];
-
-      if (topMovie || topSerie){
-        featuredBox.style.display = "block";
-        featuredGrid.innerHTML = [
-          featuredCard("🎬 #1 Película", topMovie),
-          featuredCard("📺 #1 Serie", topSerie)
-        ].join("");
-      } else {
-        featuredBox.style.display = "none";
-      }
-
-      if(opts.moviesMetaId) document.getElementById(opts.moviesMetaId).textContent = data?.updatedAt ? `Fecha: ${data.updatedAt}` : "—";
-      if(opts.seriesMetaId) document.getElementById(opts.seriesMetaId).textContent = data?.updatedAt ? `Fecha: ${data.updatedAt}` : "—";
-    }
-
-    // --------- Load current ----------
-    async function loadCurrent(){
+    async function load(){
       const err = document.getElementById("err");
       try{
         const r = await fetch("./data/latest.json?ts=" + Date.now(), { cache:"no-store" });
         if(!r.ok) throw new Error("No puedo cargar data/latest.json (HTTP " + r.status + ")");
         const data = await r.json();
 
-        renderSection(data, {
-          updatedAtId: "updatedAt",
-          moviesListId: "moviesList",
-          seriesListId: "seriesList",
-          featuredBoxId: "featured",
-          featuredGridId: "featuredGrid"
-        });
+        document.getElementById("updatedAt").textContent = data.updatedAt || "—";
+
+        const moviesRanked = prepareRanking(data.movies);
+        const seriesRanked = prepareRanking(data.series);
+
+        const moviesTop = moviesRanked.slice(0, 5);
+        const seriesTop = seriesRanked.slice(0, 5);
+
+        document.getElementById("moviesList").innerHTML =
+          moviesTop.length
+            ? moviesTop.map(rowHTML).join("")
+            : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay películas con cobertura</span></div><div></div></div>`;
+
+        document.getElementById("seriesList").innerHTML =
+          seriesTop.length
+            ? seriesTop.map(rowHTML).join("")
+            : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay series con cobertura</span></div><div></div></div>`;
+
+        const featured = document.getElementById("featured");
+        const featuredGrid = document.getElementById("featuredGrid");
+        const topMovie = moviesTop[0];
+        const topSerie = seriesTop[0];
+
+        if (topMovie || topSerie){
+          featured.style.display = "block";
+          featuredGrid.innerHTML = [
+            featuredCard("🎬 #1 Película", topMovie),
+            featuredCard("📺 #1 Serie", topSerie)
+          ].join("");
+        } else {
+          featured.style.display = "none";
+        }
 
       } catch(e){
         err.style.display = "block";
@@ -453,74 +383,7 @@
       }
     }
 
-    // --------- Load history list + selected date ----------
-    async function loadHistoryIndex(){
-      const sel = document.getElementById("historySelect");
-      const status = document.getElementById("historyStatus");
-      try{
-        const r = await fetch("./data/history/index.json?ts=" + Date.now(), { cache:"no-store" });
-        if(!r.ok) throw new Error("No puedo cargar data/history/index.json (HTTP " + r.status + ")");
-        const dates = await r.json();
-        if(!Array.isArray(dates) || !dates.length) throw new Error("index.json vacío");
-
-        // Más recientes arriba
-        const sorted = [...dates].sort().reverse();
-
-        sel.innerHTML = sorted.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join("");
-        sel.disabled = false;
-
-        status.textContent = `${sorted.length} fechas`;
-
-        // autoload más reciente
-        await loadHistoryDate(sorted[0]);
-
-        sel.addEventListener("change", async () => {
-          if(sel.value) await loadHistoryDate(sel.value);
-        });
-
-      } catch(e){
-        status.textContent = "Histórico no disponible";
-        sel.disabled = true;
-        sel.innerHTML = `<option value="">No disponible</option>`;
-        document.getElementById("historyFeatured").style.display = "none";
-        document.getElementById("historyMoviesList").innerHTML =
-          `<div class="row"><div></div><div class="title"><b>Sin histórico</b><span>${esc(e.message)}</span></div><div></div></div>`;
-        document.getElementById("historySeriesList").innerHTML = "";
-      }
-    }
-
-    async function loadHistoryDate(date){
-      const status = document.getElementById("historyStatus");
-      status.textContent = `Cargando ${date}…`;
-      try{
-        const r = await fetch(`./data/history/${date}.json?ts=` + Date.now(), { cache:"no-store" });
-        if(!r.ok) throw new Error(`No puedo cargar data/history/${date}.json (HTTP ${r.status})`);
-        const data = await r.json();
-
-        renderSection(data, {
-          updatedAtId: "historyStatus",          // aquí mostramos la fecha cargada
-          moviesListId: "historyMoviesList",
-          seriesListId: "historySeriesList",
-          featuredBoxId: "historyFeatured",
-          featuredGridId: "historyFeaturedGrid",
-          moviesMetaId: "historyMoviesMeta",
-          seriesMetaId: "historySeriesMeta"
-        });
-
-        // Ajuste: historyStatus debe mostrar texto humano
-        document.getElementById("historyStatus").textContent = `Mostrando ${data?.updatedAt || date}`;
-
-      } catch(e){
-        status.textContent = "Error";
-        document.getElementById("historyFeatured").style.display = "none";
-        document.getElementById("historyMoviesList").innerHTML =
-          `<div class="row"><div></div><div class="title"><b>Error histórico</b><span>${esc(e.message)}</span></div><div></div></div>`;
-        document.getElementById("historySeriesList").innerHTML = "";
-      }
-    }
-
-    loadCurrent();
-    loadHistoryIndex();
+    load();
   </script>
 </body>
 </html>
