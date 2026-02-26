@@ -31,14 +31,87 @@ const omdbByImdbId = async (imdbId) => {
   return Number.isFinite(rating) ? rating : null;
 };
 
+// Normalización para limpiar sufijos de FA (“SerieAnimación”, “Miniserie”…)
+function stripDiacritics(s) {
+  return String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
+ * Limpieza de títulos:
+ * - quita paréntesis, parte tras ":" y comillas
+ * - elimina sufijos típicos de FA al FINAL: SerieAnimación, Serie, Miniserie, etc (con/ sin acentos, pegados o separados)
+ */
 const cleanTitle = (t) => {
   if (!t) return null;
-  return String(t)
+
+  let s = String(t)
     .replace(/\s*\(.*?\)\s*/g, " ")        // quita (…)
     .replace(/\s*:\s*.*/g, "")            // quita “: …”
     .replace(/[’'"]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+
+  // Normaliza guiones
+  s = s.replace(/\s*–\s*/g, " - ").replace(/\s*-\s*/g, " - ").trim();
+
+  // Quitar sufijos al final, permitiendo:
+  // - “SerieAnimación” pegado
+  // - “Serie Animación” separado
+  // - variantes sin acento: “SerieAnimacion”
+  // - “Miniserie”, “Serie TV”, etc.
+  const suffixes = [
+    "serieanimacion",
+    "serie animacion",
+    "serie",
+    "serietv",
+    "serie tv",
+    "serie de tv",
+    "serie de television",
+    "miniserie",
+    "tv",
+    "documental",
+    "serie documental",
+  ];
+
+  const sNoAcc = stripDiacritics(s).toLowerCase();
+
+  // Intentamos borrar 1–2 sufijos encadenados (por si acaso)
+  for (let pass = 0; pass < 2; pass++) {
+    let changed = false;
+
+    for (const suf of suffixes) {
+      // acepta separadores antes del sufijo y también casos "pegados"
+      const re = new RegExp(
+        `(?:\\s*[\\-–—·•|/:]?\\s*)${suf}\\s*$`,
+        "i"
+      );
+
+      if (re.test(stripDiacritics(s).toLowerCase())) {
+        // Para borrar en el string original, aplicamos sobre versión sin acentos, pero recortamos en original por longitud.
+        // Método robusto: recortar hasta antes del match calculando en la versión "noAcc".
+        const m = stripDiacritics(s).toLowerCase().match(re);
+        if (m) {
+          // Encuentra el índice donde empieza el match en sNoAcc
+          const idx = stripDiacritics(s).toLowerCase().lastIndexOf(m[0].trim());
+          if (idx >= 0) {
+            // aproximación: recorta original a la misma longitud proporcional
+            // (en la práctica funciona bien porque solo elimina el final)
+            const cutLen = Math.max(0, s.length - m[0].length);
+            s = s.slice(0, cutLen).trim();
+            changed = true;
+          } else {
+            s = s.replace(new RegExp(`(?:\\s*[\\-–—·•|/:]?\\s*)${m[0]}\\s*$`, "i"), "").trim();
+            changed = true;
+          }
+        }
+      }
+    }
+
+    s = s.replace(/\s+/g, " ").trim();
+    if (!changed) break;
+  }
+
+  return s || null;
 };
 
 function whereString({ platforms, inCinemasES }) {
@@ -49,14 +122,11 @@ function whereString({ platforms, inCinemasES }) {
   return "España";
 }
 
-function todayISO() {
-  return new Date().toISOString().slice(0, 10);
-}
-
 // ---------------- TMDb: título ES + estreno ES + providers ES + géneros ----------------
 async function getMovieESDetails(id) {
   const d = await tmdb(`movie/${id}`, { language: "es-ES" });
 
+  // Estreno ES + flag "cines"
   let releaseES = d.release_date || null;
   let inCinemasES = false;
 
@@ -66,9 +136,10 @@ async function getMovieESDetails(id) {
     const rds = es?.release_dates || [];
     const date = rds?.[0]?.release_date;
     if (date) releaseES = date.slice(0, 10);
-    if (rds.some((x) => x?.type === 3 || x?.type === 2)) inCinemasES = true;
+    if (rds.some((x) => x?.type === 3 || x?.type === 2)) inCinemasES = true; // theatrical/limited
   } catch {}
 
+  // Providers ES
   let platforms = [];
   try {
     const wp = await tmdb(`movie/${id}/watch/providers`);
@@ -155,37 +226,13 @@ function normalizeFAUrl(href) {
   return `https://www.filmaffinity.com/es/${href}`;
 }
 
-// --- Similaridad muy simple y efectiva: títulos normalizados por tokens
-function normForMatch(s) {
-  return String(s ?? "")
-    .toLowerCase()
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function tokenSet(s) {
-  return new Set(normForMatch(s).split(" ").filter(Boolean));
-}
-
-function jaccard(a, b) {
-  const A = tokenSet(a);
-  const B = tokenSet(b);
-  if (!A.size || !B.size) return 0;
-  let inter = 0;
-  for (const t of A) if (B.has(t)) inter++;
-  const union = A.size + B.size - inter;
-  return union ? inter / union : 0;
-}
-
-// Devuelve candidatos (hasta N) en vez de solo el primero
-async function faFindTitleUrls(query, limit = 6) {
+async function faFindTitleUrl(query) {
   const url = new URL("https://www.filmaffinity.com/es/search.php");
   url.searchParams.set("stext", query);
   url.searchParams.set("stype", "all");
 
   const html = await faFetch(url.toString());
-  if (!html) return [];
+  if (!html) return null;
 
   const $ = cheerio.load(html);
   const links = [];
@@ -196,12 +243,12 @@ async function faFindTitleUrls(query, limit = 6) {
   });
 
   const uniq = [...new Set(links)].map(normalizeFAUrl).filter(Boolean);
-  return uniq.slice(0, limit);
+  return uniq.length ? uniq[0] : null;
 }
 
 async function faGetRatingFromTitlePage(faUrl) {
   const html = await faFetch(faUrl);
-  if (!html) return { fa: null, faTitle: null, faYear: null };
+  if (!html) return { fa: null, faTitle: null };
 
   const $ = cheerio.load(html);
 
@@ -209,11 +256,6 @@ async function faGetRatingFromTitlePage(faUrl) {
     cleanTitle($("h1").first().text()) ||
     cleanTitle($("title").first().text().replace(/\s*\|\s*FilmAffinity.*/i, "")) ||
     null;
-
-  // intenta sacar año del <title> si aparece (bastante común)
-  const t = $("title").first().text() || "";
-  const ym = t.match(/\b(19\d{2}|20\d{2})\b/);
-  const faYear = ym ? ym[1] : null;
 
   let rating = null;
   const meta = $('meta[itemprop="ratingValue"]').attr("content");
@@ -231,12 +273,11 @@ async function faGetRatingFromTitlePage(faUrl) {
     }
   }
 
-  return { fa: rating, faTitle, faYear };
+  return { fa: rating, faTitle };
 }
 
 const faCache = new Map();
 
-// Escoge el mejor candidato por similitud de título + bonus por año
 async function getFARating({ titleEs, titleOriginal, year }) {
   const es = cleanTitle(titleEs);
   const orig = cleanTitle(titleOriginal);
@@ -248,48 +289,25 @@ async function getFARating({ titleEs, titleOriginal, year }) {
     orig,
   ].filter(Boolean);
 
-  const targetTitle = es || orig;
-  const targetYear = year ? String(year) : null;
-
   for (const q of queries) {
     if (faCache.has(q)) return faCache.get(q);
 
     await sleep(250);
-    const candidates = await faFindTitleUrls(q, 6);
-    if (!candidates.length) {
+    const faUrl = await faFindTitleUrl(q);
+    if (!faUrl) {
       const res = { fa: null, faUrl: null, faTitle: null };
       faCache.set(q, res);
       continue;
     }
 
-    // Evaluamos candidatos
-    let best = { score: -1, fa: null, faUrl: null, faTitle: null };
+    await sleep(250);
+    const { fa, faTitle } = await faGetRatingFromTitlePage(faUrl);
 
-    for (const url of candidates) {
-      await sleep(250);
-      const { fa, faTitle, faYear } = await faGetRatingFromTitlePage(url);
-
-      const sim = targetTitle && faTitle ? jaccard(targetTitle, faTitle) : 0;
-      const yearBonus =
-        targetYear && faYear && targetYear === String(faYear) ? 0.25 : 0;
-
-      const total = sim + yearBonus;
-
-      if (total > best.score) {
-        best = {
-          score: total,
-          fa: typeof fa === "number" ? fa : null,
-          faUrl: url,
-          faTitle: faTitle || null,
-        };
-      }
-    }
-
-    // Umbral: si no parece match, lo descartamos
-    const res =
-      best.score >= 0.35
-        ? { fa: best.fa, faUrl: best.faUrl, faTitle: best.faTitle }
-        : { fa: null, faUrl: null, faTitle: null };
+    const res = {
+      fa: typeof fa === "number" ? fa : null,
+      faUrl,
+      faTitle: faTitle || null,
+    };
 
     faCache.set(q, res);
 
@@ -299,7 +317,7 @@ async function getFARating({ titleEs, titleOriginal, year }) {
   return { fa: null, faUrl: null, faTitle: null };
 }
 
-// ---------------- scoring (listo para RT/MC mañana) ----------------
+// ---------------- scoring ----------------
 const WEIGHTS = { fa: 0.25, imdb: 0.25, rtCrit: 0.125, rtAud: 0.125, mcCrit: 0.125, mcUser: 0.125 };
 const to10 = (x100) => (typeof x100 === "number" ? x100 / 10 : null);
 
@@ -401,6 +419,11 @@ const buildMoviesES = async () => {
       mcUser: null,
 
       tmdb: typeof m.vote_average === "number" ? Number(m.vote_average.toFixed(1)) : null,
+
+      // ✅ IMÁGENES para el front (poster + background)
+      posterPath: m.poster_path || null,
+      backdropPath: m.backdrop_path || null,
+
       imdbId,
     };
 
@@ -472,6 +495,11 @@ const buildSeriesES = async () => {
       mcUser: null,
 
       tmdb: typeof s.vote_average === "number" ? Number(s.vote_average.toFixed(1)) : null,
+
+      // ✅ IMÁGENES para el front (poster + background)
+      posterPath: s.poster_path || null,
+      backdropPath: s.backdrop_path || null,
+
       imdbId,
     };
 
@@ -491,24 +519,15 @@ const main = async () => {
   const movies = await buildMoviesES();
   const series = await buildSeriesES();
 
-  const date = todayISO();
-  const payload = {
-    updatedAt: date,
-    movies,
-    series,
-  };
+  const date = new Date().toISOString().slice(0, 10);
+  const payload = { updatedAt: date, movies, series };
 
   await fs.mkdir("data", { recursive: true });
   await fs.mkdir("data/history", { recursive: true });
 
-  // latest
   await fs.writeFile("data/latest.json", JSON.stringify(payload, null, 2), "utf8");
-
-  // histórico (snapshot por fecha)
   await fs.writeFile(`data/history/${date}.json`, JSON.stringify(payload, null, 2), "utf8");
 
-  // índice (lista de fechas disponibles) para futuro uso en UI
-  // (lo hacemos simple: añadimos la fecha si no existe)
   const indexPath = "data/history/index.json";
   let index = [];
   try {
@@ -516,7 +535,7 @@ const main = async () => {
     if (!Array.isArray(index)) index = [];
   } catch {}
   if (!index.includes(date)) index.push(date);
-  index.sort(); // asc
+  index.sort();
   await fs.writeFile(indexPath, JSON.stringify(index, null, 2), "utf8");
 
   console.log("Wrote data/latest.json and data/history/" + date + ".json");
