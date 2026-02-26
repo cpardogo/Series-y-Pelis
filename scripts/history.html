@@ -1,0 +1,455 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Histórico · Radar semanal</title>
+
+  <style>
+    :root{
+      --bg:#0b0f19; --panel:#111827; --text:#e5e7eb; --muted:#9ca3af; --border:rgba(255,255,255,.08);
+      --shadow: 0 10px 30px rgba(0,0,0,.35); --radius:16px;
+    }
+    @media (prefers-color-scheme: light){
+      :root{ --bg:#f6f7fb; --panel:#ffffff; --text:#111827; --muted:#6b7280; --border:rgba(0,0,0,.08); --shadow: 0 10px 25px rgba(0,0,0,.08);}
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background: radial-gradient(1200px 600px at 10% -10%, rgba(96,165,250,.25), transparent 60%),
+                  radial-gradient(900px 500px at 90% 0%, rgba(52,211,153,.18), transparent 60%),
+                  var(--bg);
+      color:var(--text);
+    }
+    .wrap{max-width:1100px;margin:0 auto;padding:22px}
+    header{
+      position:sticky; top:0; z-index:10;
+      backdrop-filter: blur(12px);
+      background: linear-gradient(to bottom, rgba(0,0,0,.35), rgba(0,0,0,0));
+      border-bottom:1px solid var(--border);
+    }
+    .topbar{display:flex; gap:16px; align-items:flex-start; justify-content:space-between; padding:16px 22px}
+    h1{margin:0; font-size:18px; letter-spacing:.2px}
+    .sub{margin:4px 0 0; color:var(--muted); font-size:13px; line-height:1.3}
+    .chips{display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end}
+    .chip{
+      padding:8px 10px; border:1px solid var(--border); border-radius:999px;
+      background:rgba(255,255,255,.04);
+      font-size:12px; color:var(--muted)
+    }
+    .navlink{
+      padding:8px 10px; border:1px solid var(--border); border-radius:999px;
+      background:rgba(255,255,255,.04);
+      font-size:12px; color:var(--text);
+      text-decoration:none;
+    }
+    .navlink:hover{text-decoration:underline}
+
+    .controls{
+      margin-top:14px;
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      background: rgba(255,255,255,.04);
+      box-shadow: var(--shadow);
+      padding: 12px 14px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    select{
+      background:rgba(255,255,255,.04);
+      color:var(--text);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:8px 10px;
+      font-size:13px;
+      outline:none;
+    }
+    .mini{ font-size:12px; color:var(--muted); }
+
+    .grid{display:grid; grid-template-columns: repeat(12, 1fr); gap:14px; margin-top:14px}
+    .card{
+      grid-column: span 12;
+      border:1px solid var(--border);
+      background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03));
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow:hidden;
+    }
+    .hd{padding:16px 16px 10px; display:flex; justify-content:space-between; gap:12px; align-items:flex-start}
+    .hd h2{margin:0; font-size:15px}
+    .hd .meta{color:var(--muted); font-size:12px; margin-top:3px}
+    .pill{
+      display:inline-flex; align-items:center; gap:6px;
+      border:1px solid var(--border);
+      padding:6px 10px; border-radius:999px;
+      color:var(--muted); font-size:12px;
+      background:rgba(255,255,255,.04);
+      white-space:nowrap;
+    }
+    .list{padding:0 8px 10px}
+
+    .row{
+      display:grid;
+      grid-template-columns: 36px 1.4fr 160px;
+      gap:10px;
+      align-items:flex-start;
+      padding:12px 10px;
+      border-top:1px solid var(--border);
+    }
+    .rank{
+      width:28px; height:28px; border-radius:10px;
+      display:grid; place-items:center;
+      background:rgba(96,165,250,.12);
+      border:1px solid rgba(96,165,250,.22);
+      font-weight:800; font-size:12px;
+      margin-top:2px;
+    }
+    .title{display:flex; flex-direction:column; gap:6px}
+    .title b{font-size:13px; line-height:1.25}
+    .title b a{color:inherit;text-decoration:none}
+    .title b a:hover{text-decoration:underline}
+
+    .platforms, .genres {display:flex; gap:6px; flex-wrap:wrap}
+    .badge{
+      display:inline-flex; align-items:center; gap:6px;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.04);
+      padding:4px 8px;
+      border-radius:999px;
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+    }
+    .badge.cines{border-color:rgba(255,255,255,.18)}
+
+    .scorepill{
+      display:flex; flex-direction:column; align-items:flex-end; gap:6px;
+      padding-top:2px;
+    }
+    .pillScore{
+      display:inline-flex; align-items:center; justify-content:center;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.04);
+      border-radius:999px;
+      padding:6px 10px;
+      font-weight:800;
+      min-width: 92px;
+      font-variant-numeric: tabular-nums;
+    }
+    .submeta{color:var(--muted); font-size:11px; text-align:right}
+
+    .featured{
+      border:1px solid var(--border);
+      border-radius: var(--radius);
+      background: linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03));
+      box-shadow: var(--shadow);
+      padding:14px 14px 12px;
+      margin-top:14px;
+    }
+    .featured h3{margin:0 0 10px; font-size:14px}
+    .featuredGrid{display:grid;grid-template-columns:1fr;gap:10px}
+    @media (min-width: 900px){ .featuredGrid{grid-template-columns:1fr 1fr;} }
+
+    .featItem{
+      position:relative;
+      border:1px solid var(--border);
+      background:rgba(255,255,255,.04);
+      border-radius:14px;
+      padding:12px;
+      overflow:hidden;
+    }
+    .featItem.hasBg::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:
+        linear-gradient(90deg, rgba(0,0,0,.72), rgba(0,0,0,.25)),
+        linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.35)),
+        var(--bgimg);
+      background-size: cover;
+      background-position: center;
+      opacity: 1;
+      pointer-events:none;
+    }
+    .featItem .t{
+      position:relative;
+      display:flex;
+      justify-content:space-between;
+      gap:12px;
+      align-items:flex-start;
+    }
+    .featLeft{
+      display:flex;
+      gap:12px;
+      align-items:flex-start;
+      min-width:0;
+      flex: 1;
+    }
+    .featPoster{
+      width:52px;
+      height:78px;
+      border-radius:10px;
+      overflow:hidden;
+      border:1px solid rgba(255,255,255,.12);
+      background:rgba(255,255,255,.06);
+      flex: 0 0 auto;
+    }
+    .featPoster img{ width:100%; height:100%; object-fit:cover; display:block; }
+    .featText{min-width:0;}
+    .featItem a{color:inherit;text-decoration:none}
+    .featItem a:hover{text-decoration:underline}
+
+    @media (min-width: 900px){
+      .card.half{grid-column: span 6;}
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="topbar">
+      <div>
+        <h1>Histórico</h1>
+        <div class="sub">Elige una fecha para ver el Top 5 de esa semana.</div>
+      </div>
+      <div class="chips">
+        <a class="navlink" href="./index.html">← Volver</a>
+        <div class="chip">Fecha cargada: <b id="loadedDate">—</b></div>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="controls">
+      <div>
+        <div class="mini">Selecciona fecha</div>
+        <select id="historySelect" disabled>
+          <option value="">Cargando…</option>
+        </select>
+      </div>
+      <div class="mini" id="status">—</div>
+    </div>
+
+    <div class="featured" id="featured" style="display:none">
+      <h3>✨ Destacadas</h3>
+      <div class="featuredGrid" id="featuredGrid"></div>
+    </div>
+
+    <div class="grid">
+      <section class="card half">
+        <div class="hd">
+          <div>
+            <h2>🎬 Películas · Top 5</h2>
+            <div class="meta" id="moviesMeta">—</div>
+          </div>
+          <span class="pill">Histórico</span>
+        </div>
+        <div class="list" id="moviesList"></div>
+      </section>
+
+      <section class="card half">
+        <div class="hd">
+          <div>
+            <h2>📺 Series · Top 5</h2>
+            <div class="meta" id="seriesMeta">—</div>
+          </div>
+          <span class="pill">Histórico</span>
+        </div>
+        <div class="list" id="seriesList"></div>
+      </section>
+    </div>
+  </main>
+
+  <script>
+    function esc(s){ return String(s ?? "").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;"); }
+    function badge(text, cls=""){ return `<span class="badge ${cls}">${esc(text)}</span>`; }
+
+    function parseCoverageStrict(cov){
+      if(cov == null) return null;
+      const s = String(cov).trim();
+      if(!s || s === "—") return null;
+      const m = s.match(/^(\d+)\s*\/\s*(\d+)$/);
+      if(m){
+        const num = Number(m[1]), den = Number(m[2]);
+        if(!Number.isFinite(num) || !Number.isFinite(den) || den <= 0) return null;
+        return { num, den };
+      }
+      const n = Number(s);
+      if(Number.isFinite(n)) return { num: n, den: null };
+      return null;
+    }
+    function hasValidCoverage(item){
+      const c = parseCoverageStrict(item?.coverage);
+      return !!c && c.num > 0;
+    }
+    function finalScore(item){
+      return (typeof item?.final === "number") ? item.final : -Infinity;
+    }
+    function prepareRanking(arr){
+      const clean = (Array.isArray(arr) ? arr : []).filter(Boolean).filter(hasValidCoverage);
+      clean.sort((a,b) => finalScore(b) - finalScore(a));
+      clean.forEach((x,i) => x.rank = i + 1);
+      return clean;
+    }
+
+    function rowHTML(item){
+      const platformsArr = Array.isArray(item.platforms) ? item.platforms.filter(Boolean) : [];
+      const platforms = platformsArr.map(p => badge(p)).join("") || badge(item.where || "España");
+      const cines = item.inCinemasES ? badge("Cines", "cines") : "";
+      const release = item.releaseES ? badge(`ES: ${item.releaseES}`) : "";
+
+      const genresArr = Array.isArray(item.genres) ? item.genres.slice(0,3) : [];
+      const genres = genresArr.length ? genresArr.map(g => badge(g)).join("") : "";
+
+      const href = item.faUrl || item.imdbUrl || null;
+      const title = esc(item.title ?? "—");
+      const titleHTML = href
+        ? `<a href="${href}" target="_blank" rel="noopener noreferrer">${title} ↗</a>`
+        : title;
+
+      const final = (typeof item.final === "number") ? item.final.toFixed(2) : "—";
+      const cov = item.coverage ? `Cobertura ${item.coverage}` : "";
+
+      return `
+        <div class="row">
+          <div class="rank">${item.rank ?? ""}</div>
+          <div class="title">
+            <b>${titleHTML}</b>
+            <div class="platforms">${cines}${platforms}${release}</div>
+            ${genres ? `<div class="genres">${genres}</div>` : ``}
+          </div>
+          <div class="scorepill">
+            <div class="pillScore">${final}</div>
+            <div class="submeta">${esc(cov)}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function tmdbPosterUrl(item){
+      const p = item?.posterPath || null;
+      return p ? `https://image.tmdb.org/t/p/w342${p}` : null;
+    }
+    function tmdbBgUrl(item){
+      const p = item?.backdropPath || item?.posterPath || null;
+      return p ? `https://image.tmdb.org/t/p/w780${p}` : null;
+    }
+
+    function featuredCard(label, x){
+      if(!x) return "";
+      const href = x.faUrl || x.imdbUrl || "#";
+      const p = Array.isArray(x.platforms) && x.platforms.length ? x.platforms.join(" · ") : (x.where || "España");
+      const g = Array.isArray(x.genres) && x.genres.length ? x.genres.slice(0,3).join(" / ") : "—";
+      const c = x.inCinemasES ? "Cines · " : "";
+      const final = (typeof x.final === "number") ? x.final.toFixed(2) : "—";
+
+      const poster = tmdbPosterUrl(x);
+      const bg = tmdbBgUrl(x);
+      const cls = bg ? "featItem hasBg" : "featItem";
+      const style = bg ? `style="--bgimg:url('${bg}')"` : "";
+
+      const posterHTML = poster
+        ? `<div class="featPoster"><img src="${poster}" alt="" loading="lazy" decoding="async"></div>`
+        : `<div class="featPoster" aria-hidden="true"></div>`;
+
+      return `
+        <div class="${cls}" ${style}>
+          <div class="t">
+            <div class="featLeft">
+              ${posterHTML}
+              <div class="featText">
+                <div class="submeta">${esc(label)}</div>
+                <b><a href="${href}" target="_blank" rel="noopener noreferrer">${esc(x.title)} ↗</a></b>
+                <div class="submeta">${esc(c + p)}${x.releaseES ? " · ES: " + esc(x.releaseES) : ""}</div>
+                <div class="submeta">Género: ${esc(g)}</div>
+              </div>
+            </div>
+            <div class="pillScore">${final}</div>
+          </div>
+        </div>
+      `;
+    }
+
+    function render(data){
+      document.getElementById("loadedDate").textContent = data?.updatedAt || "—";
+      document.getElementById("moviesMeta").textContent = data?.updatedAt ? `Fecha: ${data.updatedAt}` : "—";
+      document.getElementById("seriesMeta").textContent = data?.updatedAt ? `Fecha: ${data.updatedAt}` : "—";
+
+      const moviesRanked = prepareRanking(data?.movies);
+      const seriesRanked = prepareRanking(data?.series);
+
+      const moviesTop = moviesRanked.slice(0, 5);
+      const seriesTop = seriesRanked.slice(0, 5);
+
+      document.getElementById("moviesList").innerHTML =
+        moviesTop.length
+          ? moviesTop.map(rowHTML).join("")
+          : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay películas con cobertura</span></div><div></div></div>`;
+
+      document.getElementById("seriesList").innerHTML =
+        seriesTop.length
+          ? seriesTop.map(rowHTML).join("")
+          : `<div class="row"><div></div><div class="title"><b>Sin datos</b><span>No hay series con cobertura</span></div><div></div></div>`;
+
+      const featured = document.getElementById("featured");
+      const featuredGrid = document.getElementById("featuredGrid");
+      const topMovie = moviesTop[0];
+      const topSerie = seriesTop[0];
+
+      if (topMovie || topSerie){
+        featured.style.display = "block";
+        featuredGrid.innerHTML = [
+          featuredCard("🎬 #1 Película", topMovie),
+          featuredCard("📺 #1 Serie", topSerie)
+        ].join("");
+      } else {
+        featured.style.display = "none";
+      }
+    }
+
+    async function loadIndex(){
+      const sel = document.getElementById("historySelect");
+      const status = document.getElementById("status");
+
+      try{
+        const r = await fetch("./data/history/index.json?ts=" + Date.now(), { cache:"no-store" });
+        if(!r.ok) throw new Error("No puedo cargar data/history/index.json (HTTP " + r.status + ")");
+        const dates = await r.json();
+        if(!Array.isArray(dates) || !dates.length) throw new Error("index.json vacío");
+
+        const sorted = [...dates].sort().reverse();
+        sel.innerHTML = sorted.map(d => `<option value="${esc(d)}">${esc(d)}</option>`).join("");
+        sel.disabled = false;
+        status.textContent = `${sorted.length} fechas`;
+
+        async function loadDate(date){
+          status.textContent = `Cargando ${date}…`;
+          const rr = await fetch(`./data/history/${date}.json?ts=` + Date.now(), { cache:"no-store" });
+          if(!rr.ok) throw new Error(`No puedo cargar data/history/${date}.json (HTTP ${rr.status})`);
+          const data = await rr.json();
+          render(data);
+          status.textContent = `Mostrando ${data?.updatedAt || date}`;
+        }
+
+        await loadDate(sorted[0]);
+
+        sel.addEventListener("change", async () => {
+          if(!sel.value) return;
+          try { await loadDate(sel.value); }
+          catch(e){ status.textContent = "Error cargando esa fecha"; }
+        });
+
+      } catch(e){
+        status.textContent = "Histórico no disponible";
+        sel.disabled = true;
+        sel.innerHTML = `<option value="">No disponible</option>`;
+      }
+    }
+
+    loadIndex();
+  </script>
+</body>
+</html>
