@@ -1,245 +1,59 @@
-<script>
-/**
- * MODO REAL (histórico semanal)
- * Lee:
- *  - ./data/movies/index.json        -> { "weeks": ["YYYY-MM-DD", ...] } (orden desc recomendado)
- *  - ./data/movies/weeks/<week>.json -> { "week":"YYYY-MM-DD", "items":[...], ... }
- *
- * Nota: tus items reales NO tienen por qué venir con la estructura demo.
- * Este adaptador intenta mapear lo que generamos en el pipeline a la estructura que tu tabla espera.
- */
+<section id="filters"></section>
+<section id="results"></section>
 
-const IDEAL_WEIGHTS = { fa:0.25, imdb:0.25, rt_crit:0.125, rt_aud:0.125, mc_meta:0.125, mc_user:0.125 };
+<script type="module">
+  import { passesUIFilters } from "./modules/rules.js";
+  import { computeCoverage, coverageBadgeText } from "./modules/coverage.js";
+  import { buildFilterOptions, mountFilters, FILTERS_CSS } from "./modules/ui_filters.js";
 
-function to10_rt(x){ return (typeof x==="number") ? (x/10) : null; }
-function to10_mcmeta(x){ return (typeof x==="number") ? (x/10) : null; }
+  const style = document.createElement("style");
+  style.textContent = FILTERS_CSS;
+  document.head.appendChild(style);
 
-// ✅ Cambio clave: permitimos calcular Final con las fuentes disponibles (al menos IMDb o FA)
-function computeFinal(r){
-  if(!r || (typeof r.fa!=="number" && typeof r.imdb!=="number")) return null;
+  const DATA_URL = "./data/peliculas.json"; // 🔴 cambia si se llama distinto
 
-  const mapped = {
-    fa: (typeof r.fa==="number") ? r.fa : null,
-    imdb: (typeof r.imdb==="number") ? r.imdb : null,
-    rt_crit: to10_rt(r.rt_crit),
-    rt_aud: to10_rt(r.rt_aud),
-    mc_meta: to10_mcmeta(r.mc_meta),
-    mc_user: (typeof r.mc_user==="number") ? r.mc_user : null
-  };
-
-  let wsum = 0;
-  const available = [];
-  for(const k in IDEAL_WEIGHTS){
-    if(mapped[k] !== null && mapped[k] !== undefined){
-      wsum += IDEAL_WEIGHTS[k];
-      available.push(k);
-    }
+  async function loadItems() {
+    const res = await fetch(DATA_URL, { cache: "no-store" });
+    if (!res.ok) throw new Error("No puedo cargar " + DATA_URL);
+    const data = await res.json();
+    return Array.isArray(data) ? data : (data.items || []);
   }
 
-  if(wsum === 0) return null;
+  let items = await loadItems();
 
-  let total = 0;
-  for(const k of available){
-    total += (IDEAL_WEIGHTS[k]/wsum) * mapped[k];
-  }
-  return Math.round(total*100)/100;
-}
+  const base = items.map(it => ({ ...it, type: it.type || "movie" }));
 
-function coverage(r){
-  const fields = ["fa","imdb","rt_crit","rt_aud","mc_meta","mc_user"];
-  let have = 0;
-  for(const f of fields){ if(r && typeof r[f] === "number") have++; }
-  return `${have}/6`;
-}
+  const options = buildFilterOptions(base);
+  let currentState = { platformsSelected: [], genresSelected: [] };
 
-function boolToYes(b){ return b ? "Sí" : "No"; }
-
-// ---------- CARGA REAL ----------
-let WEEKS = [];                 // ["YYYY-MM-DD", ...] desc
-let WEEK_CACHE = new Map();     // week -> items adaptados
-let currentIdx = 0;
-
-async function fetchJSON(url){
-  const r = await fetch(url + (url.includes("?") ? "&" : "?") + "ts=" + Date.now(), { cache:"no-store" });
-  if(!r.ok) throw new Error(`No puedo cargar ${url} (HTTP ${r.status})`);
-  return r.json();
-}
-
-function slugId(title){
-  return (title || "")
-    .toLowerCase()
-    .normalize("NFD").replace(/[\u0300-\u036f]/g,"")
-    .replace(/[^a-z0-9]+/g,"-")
-    .replace(/(^-|-$)/g,"")
-    .slice(0,60) || ("id-" + Math.random().toString(16).slice(2));
-}
-
-// Adaptador: convierte item REAL -> estructura DEMO que tu tabla espera
-function adaptItem(real){
-  // Si ya viene en formato demo, lo devolvemos tal cual
-  if(real && real.ratings && real.availability && real.release_es) return real;
-
-  const title = real.title || real.name || "Sin título";
-  const id = real.id || real.imdbId || slugId(title);
-
-  // Soportar nombres en español (los que generamos en el script)
-  const release_es = real.release_es || real.estreno_es || real.releaseDate || null;
-  const release_type = real.release_type || real.tipo_estreno || real.where || "N/D";
-
-  const availability = real.availability || {
-    cines: String(real.cines || "").toLowerCase() === "sí" || real.cines === true,
-    netflix: String(real.netflix || "").toLowerCase() === "sí" || real.netflix === true,
-    prime: String(real.prime || "").toLowerCase() === "sí" || real.prime === true,
-    disney: String(real.disney || "").toLowerCase() === "sí" || real.disney === true,
-    movistar: String(real.movistar || "").toLowerCase() === "sí" || real.movistar === true
-  };
-
-  const ratings = real.ratings || {
-    fa: (typeof real.fa === "number") ? real.fa : null,
-    imdb: (typeof real.imdb === "number") ? real.imdb : null,
-    rt_crit: (typeof real.rt_c === "number") ? real.rt_c : (typeof real.rt_crit === "number" ? real.rt_crit : null),
-    rt_aud:  (typeof real.rt_a === "number") ? real.rt_a : (typeof real.rt_aud === "number" ? real.rt_aud : null),
-    mc_meta: (typeof real.mc_m === "number") ? real.mc_m : (typeof real.mc_meta === "number" ? real.mc_meta : null),
-    mc_user: (typeof real.mc_u === "number") ? real.mc_u : (typeof real.mc_user === "number" ? real.mc_user : null),
-  };
-
-  return {
-    id,
-    title,
-    release_es,
-    release_type,
-    country: real.country || real.pais || "N/D",
-    language: real.language || real.idioma || "N/D",
-    genre: real.genre || real.genero || "N/D",
-    availability,
-    ratings
-  };
-}
-
-async function loadWeeksIndex(){
-  const idx = await fetchJSON("./data/movies/index.json");
-  const weeks = idx.weeks || [];
-  if(!Array.isArray(weeks) || weeks.length === 0) throw new Error("index.json no tiene semanas");
-  WEEKS = weeks; // se asume desc
-}
-
-async function loadWeekItems(week){
-  if(WEEK_CACHE.has(week)) return WEEK_CACHE.get(week);
-  const wk = await fetchJSON(`./data/movies/weeks/${week}.json`);
-  const items = (wk.items || []).map(adaptItem);
-  WEEK_CACHE.set(week, items);
-  return items;
-}
-
-async function setWeekOptionsReal(){
-  const sel = document.getElementById("weekSelect");
-  sel.innerHTML = "";
-  WEEKS.forEach((w, idx) => {
-    const opt = document.createElement("option");
-    opt.value = String(idx);
-    opt.textContent = w;
-    sel.appendChild(opt);
+  mountFilters(document.querySelector("#filters"), options, (state) => {
+    currentState = state;
+    render();
   });
-  sel.value = "0";
-  currentIdx = 0;
-}
 
-// ---------- RENDER ----------
-async function render(){
-  const idx = parseInt(document.getElementById("weekSelect").value || "0", 10);
-  currentIdx = idx;
+  function render() {
+    const visible = base
+      .filter(it => passesUIFilters(it, currentState))
+      .map(it => {
+        const cov = computeCoverage(it);
+        return { ...it, _cov: cov, _badge: coverageBadgeText(cov.status) };
+      });
 
-  const week = WEEKS[idx];
-  const prevWeek = WEEKS[idx+1]; // semana anterior (en tu UI, idx+1 es “prev”)
-  if(!week) return;
+    document.querySelector("#results").innerHTML = visible.map(it => `
+      <article class="card">
+        <header class="card__top">
+          <h3 class="card__title">${it.title ?? it.name ?? "Sin título"}</h3>
+          <div class="card__badge" title="Falta: ${it._cov.missing.join(", ") || "Nada"}">${it._badge}</div>
+        </header>
 
-  const currentItems = await loadWeekItems(week);
-  const prevItems = prevWeek ? await loadWeekItems(prevWeek) : [];
-
-  const prevMap = new Map(prevItems.map(x => [x.id, computeFinal(x.ratings)]));
-
-  document.getElementById("lastUpdated").textContent = `Semana: ${week}`;
-
-  const tbody = document.querySelector("#tbl tbody");
-  tbody.innerHTML = "";
-
-  const q = (document.getElementById("q").value || "").toLowerCase().trim();
-
-  const items = currentItems
-    .map(x => ({...x, final: computeFinal(x.ratings)}))
-    .filter(x => x.final !== null)
-    .sort((a,b)=> b.final - a.final)
-    .filter(x => !q || (x.title.toLowerCase().includes(q)));
-
-  items.forEach((x, i) => {
-    const pr = prevMap.get(x.id);
-    let delta = "";
-    if(typeof pr === "number"){
-      const d = Math.round((x.final - pr)*100)/100;
-      delta = d===0 ? "0" : (d>0 ? `▲ ${d}` : `▼ ${Math.abs(d)}`);
-    } else if(prevWeek){
-      delta = "NEW";
-    } else {
-      delta = "—";
-    }
-    const deltaClass = delta.startsWith("▲") ? "up" : delta.startsWith("▼") ? "down" : delta==="NEW" ? "new" : "";
-
-    const rt = (typeof x.ratings.rt_crit==="number" && typeof x.ratings.rt_aud==="number")
-      ? `${x.ratings.rt_crit}% / ${x.ratings.rt_aud}%` : "N/D";
-    const mc = (typeof x.ratings.mc_meta==="number" && typeof x.ratings.mc_user==="number")
-      ? `${x.ratings.mc_meta} / ${x.ratings.mc_user}` : "N/D";
-
-    const tr = document.createElement("tr");
-    tr.innerHTML = `
-      <td class="center">${i+1}</td>
-      <td class="wrap"><b>${x.title}</b></td>
-      <td>${x.release_es ?? "N/D"}</td>
-      <td><span class="tag">${x.release_type ?? "N/D"}</span></td>
-      <td>${x.country ?? "N/D"}</td>
-      <td>${x.language ?? "N/D"}</td>
-      <td class="wrap">${x.genre ?? "N/D"}</td>
-      <td class="center">${boolToYes(!!x.availability?.cines)}</td>
-      <td class="center">${boolToYes(!!x.availability?.netflix)}</td>
-      <td class="center">${boolToYes(!!x.availability?.prime)}</td>
-      <td class="center">${boolToYes(!!x.availability?.disney)}</td>
-      <td class="center">${boolToYes(!!x.availability?.movistar)}</td>
-      <td class="right">${typeof x.ratings.fa==="number" ? x.ratings.fa.toFixed(1) : "N/D"}</td>
-      <td class="right">${typeof x.ratings.imdb==="number" ? x.ratings.imdb.toFixed(1) : "N/D"}</td>
-      <td class="right">${rt}</td>
-      <td class="right">${mc}</td>
-      <td class="center">${coverage(x.ratings)}</td>
-      <td class="right"><b>${x.final.toFixed(2)}</b></td>
-      <td class="center ${deltaClass}">${delta}</td>
-    `;
-    tbody.appendChild(tr);
-  });
-}
-
-// ---------- INIT ----------
-document.getElementById("q").addEventListener("input", () => render());
-document.getElementById("weekSelect").addEventListener("change", () => render());
-
-(async function init(){
-  try{
-    await loadWeeksIndex();
-    await setWeekOptionsReal();
-    await render();
-
-    // Opcional: cambia títulos “demo” visualmente
-    document.title = "Películas · Radar semanal";
-    const h1 = document.querySelector("h1");
-    if(h1) h1.textContent = "🎬 Películas · Radar semanal";
-
-    const note = document.querySelector(".note");
-    if(note) {
-      note.innerHTML = `<b>IMPORTANTE:</b> datos reales (IMDb hoy). Añadiremos FA/RT/MC progresivamente.`;
-    }
-  } catch(e){
-    const note = document.querySelector(".note");
-    if(note) {
-      note.innerHTML = `<b>Error cargando datos reales:</b> ${e.message}<br/>Comprueba que existe <code>data/movies/index.json</code> y <code>data/movies/weeks/&lt;week&gt;.json</code>.`;
-    }
-    console.error(e);
+        <div class="card__meta">
+          <span>${(it.platforms || []).join(" · ") || "—"}</span>
+          <span> | </span>
+          <span>${(it.genres || []).join(" · ") || "—"}</span>
+        </div>
+      </article>
+    `).join("");
   }
-})();
+
+  render();
 </script>
