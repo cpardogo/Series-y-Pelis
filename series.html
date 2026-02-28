@@ -1,53 +1,97 @@
-<!-- === SERIES: filtros + listado === -->
+<!-- === SERIES: filtros + ranking === -->
+<section id="seriesControls" style="display:flex; gap:10px; align-items:center; margin:10px 0;">
+  <button id="btnNow" type="button" class="chip chip--on">Para ver ahora</button>
+  <button id="btnNew" type="button" class="chip">Estrenos (2 semanas)</button>
+</section>
+
 <section id="filters"></section>
 <section id="results"></section>
 
 <script type="module">
-  import { isInSpainReleaseWindow, passesUIFilters } from "./modules/rules.js";
+  import { passesUIFilters } from "./modules/rules.js";
   import { computeCoverage, coverageBadgeText } from "./modules/coverage.js";
   import { buildFilterOptions, mountFilters, FILTERS_CSS } from "./modules/ui_filters.js";
 
   // 1) CSS mínimo para chips (no toca tu CSS global)
   const style = document.createElement("style");
-  style.textContent = FILTERS_CSS;
+  style.textContent = FILTERS_CSS + `
+    #seriesControls .chip{ user-select:none; }
+    #seriesControls{ flex-wrap:wrap; }
+  `;
   document.head.appendChild(style);
 
-  // 2) Carga datos de series
-  // 🔴 CAMBIA ESTA RUTA si tu JSON se llama distinto
-  // Ejemplos típicos:
-  //   ./data/series.json
-  //   ./data/radar-series.json
-  //   ./data/series-2026-02-26.json
-  const DATA_URL = "./data/series.json";
+  // 2) Carga datos del radar (latest)
+  const DATA_URL = "./data/latest.json";
 
-  async function loadItems() {
+  async function loadLatest() {
     const res = await fetch(DATA_URL, { cache: "no-store" });
     if (!res.ok) throw new Error("No puedo cargar " + DATA_URL);
-    const data = await res.json();
-
-    // Ajuste por si el JSON viene como {items:[...]} o directamente [...]
-    return Array.isArray(data) ? data : (data.items || []);
+    return res.json();
   }
 
-  let items = await loadItems();
+  const latest = await loadLatest();
 
-  // 3) Base = SOLO series estrenadas en España en últimos 14 días
-  //    (si tus items no traen type, fuerza a "series")
-  const base = items
-    .map(it => ({ ...it, type: it.type || "series" }))
-    .filter(it => it.type === "series" && isInSpainReleaseWindow(it, 14));
+  // Esperamos que el JSON tenga:
+  // { series_now: [...], series_new: [...] }
+  const lists = {
+    now: Array.isArray(latest.series_now) ? latest.series_now : [],
+    newly: Array.isArray(latest.series_new) ? latest.series_new : [],
+  };
 
-  // 4) Monta filtros
-  const options = buildFilterOptions(base);
+  // 3) Estado
+  let mode = "now"; // "now" | "newly"
   let currentState = { platformsSelected: [], genresSelected: [] };
+  let filtersController = null;
 
-  mountFilters(document.querySelector("#filters"), options, (state) => {
-    currentState = state;
+  // 4) UI: botones de modo
+  const btnNow = document.querySelector("#btnNow");
+  const btnNew = document.querySelector("#btnNew");
+
+  function setMode(nextMode) {
+    mode = nextMode;
+    btnNow.classList.toggle("chip--on", mode === "now");
+    btnNew.classList.toggle("chip--on", mode === "newly");
+
+    // reconstruye filtros según la lista activa
+    const base = getBase();
+    const options = buildFilterOptions(base);
+
+    // resetea filtros al cambiar de modo (para no “vaciar” lista sin querer)
+    currentState = { platformsSelected: [], genresSelected: [] };
+
+    const filtersMount = document.querySelector("#filters");
+    filtersMount.innerHTML = ""; // limpia
+    filtersController = mountFilters(filtersMount, options, (state) => {
+      currentState = state;
+      render();
+    });
+
     render();
-  });
+  }
 
-  // 5) Render
+  btnNow.addEventListener("click", () => setMode("now"));
+  btnNew.addEventListener("click", () => setMode("newly"));
+
+  // 5) Helpers
+  function coerceItem(it) {
+    // Normaliza nombres de campos para el render
+    return {
+      ...it,
+      type: it.type || "series",
+      // por si vienen como releaseES en lugar de releaseDateES
+      releaseDateES: it.releaseDateES || it.releaseES || null,
+    };
+  }
+
+  function getBase() {
+    const raw = mode === "now" ? lists.now : lists.newly;
+    return raw.map(coerceItem).filter(it => it.type === "series");
+  }
+
+  // 6) Render
   function render() {
+    const base = getBase();
+
     const visible = base
       .filter(it => passesUIFilters(it, currentState))
       .map(it => {
@@ -56,6 +100,20 @@
       });
 
     const mount = document.querySelector("#results");
+
+    // Mensaje si no hay datos (útil para detectar si falta series_now/series_new)
+    if (!base.length) {
+      mount.innerHTML = `
+        <div class="card" style="padding:14px;">
+          <div style="opacity:.9; font-weight:600;">No hay datos para este ranking.</div>
+          <div style="opacity:.75; margin-top:6px;">
+            Revisa que <code>data/latest.json</code> contenga <code>series_now</code> y <code>series_new</code>.
+          </div>
+        </div>
+      `;
+      return;
+    }
+
     mount.innerHTML = visible.map(it => `
       <article class="card">
         <header class="card__top">
@@ -70,13 +128,15 @@
         </div>
 
         <div class="card__meta">Estreno ES: ${it.releaseDateES || "—"}</div>
+
         <div class="card__meta">
-          IMDb: ${(it.imdb && typeof it.imdb.rating === "number") ? it.imdb.rating : "—"}
-          · FA: ${(it.fa && typeof it.fa.rating === "number") ? it.fa.rating : "—"}
+          IMDb: ${(typeof it.imdb === "number") ? it.imdb : (it.imdb && typeof it.imdb.rating === "number" ? it.imdb.rating : "—")}
+          · FA: ${(typeof it.fa === "number") ? it.fa : (it.fa && typeof it.fa.rating === "number" ? it.fa.rating : "—")}
         </div>
       </article>
     `).join("");
   }
 
-  render();
+  // 7) Init
+  setMode("now");
 </script>
