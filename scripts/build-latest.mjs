@@ -36,6 +36,51 @@ function stripDiacritics(s) {
   return String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
+// ---- Similaridad simple + normalización para matching ----
+function normalizeTitle(s = "") {
+  return stripDiacritics(String(s).toLowerCase())
+    .replace(/&/g, "and")
+    .replace(/[’'"]/g, "")
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function tokenSimilarity(a, b) {
+  const A = new Set(normalizeTitle(a).split(" ").filter(Boolean));
+  const B = new Set(normalizeTitle(b).split(" ").filter(Boolean));
+  if (!A.size || !B.size) return 0;
+
+  let inter = 0;
+  for (const t of A) if (B.has(t)) inter++;
+  const union = A.size + B.size - inter;
+  return union ? inter / union : 0;
+}
+
+// Detecta si una página de FA parece "series" o "movie" (heurística)
+function detectFATypeFromPage($) {
+  const txt = stripDiacritics($.text()).toLowerCase();
+
+  // señales típicas de series
+  const looksSeries =
+    txt.includes("miniserie") ||
+    txt.includes("serie de tv") ||
+    txt.includes("serie") ||
+    txt.includes("tv series") ||
+    txt.includes("episodios") ||
+    txt.includes("temporada");
+
+  // señales típicas de película
+  const looksMovie =
+    txt.includes("pelicula") ||
+    txt.includes("largometraje") ||
+    txt.includes("cortometraje");
+
+  if (looksSeries && !looksMovie) return "series";
+  if (looksMovie && !looksSeries) return "movie";
+  return null; // no concluyente
+}
+
 /**
  * Limpieza de títulos:
  * - quita paréntesis, parte tras ":" y comillas
@@ -45,8 +90,8 @@ const cleanTitle = (t) => {
   if (!t) return null;
 
   let s = String(t)
-    .replace(/\s*\(.*?\)\s*/g, " ")        // quita (…)
-    .replace(/\s*:\s*.*/g, "")            // quita “: …”
+    .replace(/\s*\(.*?\)\s*/g, " ") // quita (…)
+    .replace(/\s*:\s*.*/g, "") // quita “: …”
     .replace(/[’'"]/g, "")
     .replace(/\s+/g, " ")
     .trim();
@@ -54,11 +99,7 @@ const cleanTitle = (t) => {
   // Normaliza guiones
   s = s.replace(/\s*–\s*/g, " - ").replace(/\s*-\s*/g, " - ").trim();
 
-  // Quitar sufijos al final, permitiendo:
-  // - “SerieAnimación” pegado
-  // - “Serie Animación” separado
-  // - variantes sin acento: “SerieAnimacion”
-  // - “Miniserie”, “Serie TV”, etc.
+  // Quitar sufijos al final
   const suffixes = [
     "serieanimacion",
     "serie animacion",
@@ -73,37 +114,15 @@ const cleanTitle = (t) => {
     "serie documental",
   ];
 
-  const sNoAcc = stripDiacritics(s).toLowerCase();
-
   // Intentamos borrar 1–2 sufijos encadenados (por si acaso)
   for (let pass = 0; pass < 2; pass++) {
     let changed = false;
 
     for (const suf of suffixes) {
-      // acepta separadores antes del sufijo y también casos "pegados"
-      const re = new RegExp(
-        `(?:\\s*[\\-–—·•|/:]?\\s*)${suf}\\s*$`,
-        "i"
-      );
-
+      const re = new RegExp(`(?:\\s*[\\-–—·•|/:]?\\s*)${suf}\\s*$`, "i");
       if (re.test(stripDiacritics(s).toLowerCase())) {
-        // Para borrar en el string original, aplicamos sobre versión sin acentos, pero recortamos en original por longitud.
-        // Método robusto: recortar hasta antes del match calculando en la versión "noAcc".
-        const m = stripDiacritics(s).toLowerCase().match(re);
-        if (m) {
-          // Encuentra el índice donde empieza el match en sNoAcc
-          const idx = stripDiacritics(s).toLowerCase().lastIndexOf(m[0].trim());
-          if (idx >= 0) {
-            // aproximación: recorta original a la misma longitud proporcional
-            // (en la práctica funciona bien porque solo elimina el final)
-            const cutLen = Math.max(0, s.length - m[0].length);
-            s = s.slice(0, cutLen).trim();
-            changed = true;
-          } else {
-            s = s.replace(new RegExp(`(?:\\s*[\\-–—·•|/:]?\\s*)${m[0]}\\s*$`, "i"), "").trim();
-            changed = true;
-          }
-        }
+        s = s.replace(re, "").trim();
+        changed = true;
       }
     }
 
@@ -120,6 +139,21 @@ function whereString({ platforms, inCinemasES }) {
   if (p.length) return p.join(" · ");
   if (inCinemasES) return "Cines";
   return "España";
+}
+
+// Fecha ISO YYYY-MM-DD -> Date (UTC-ish)
+function parseISODate(iso) {
+  if (!iso) return null;
+  const d = new Date(String(iso).slice(0, 10) + "T00:00:00Z");
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+// Ventana (últimos N días desde estreno ES)
+function isInLastDays(isoDate, days, now = new Date()) {
+  const d = parseISODate(isoDate);
+  if (!d) return false;
+  const diffDays = (now.getTime() - d.getTime()) / (1000 * 60 * 60 * 24);
+  return diffDays >= 0 && diffDays <= days;
 }
 
 // ---------------- TMDb: título ES + estreno ES + providers ES + géneros ----------------
@@ -226,13 +260,13 @@ function normalizeFAUrl(href) {
   return `https://www.filmaffinity.com/es/${href}`;
 }
 
-async function faFindTitleUrl(query) {
+async function faFindTitleUrls(query, limit = 8) {
   const url = new URL("https://www.filmaffinity.com/es/search.php");
   url.searchParams.set("stext", query);
   url.searchParams.set("stype", "all");
 
   const html = await faFetch(url.toString());
-  if (!html) return null;
+  if (!html) return [];
 
   const $ = cheerio.load(html);
   const links = [];
@@ -243,12 +277,12 @@ async function faFindTitleUrl(query) {
   });
 
   const uniq = [...new Set(links)].map(normalizeFAUrl).filter(Boolean);
-  return uniq.length ? uniq[0] : null;
+  return uniq.slice(0, limit);
 }
 
 async function faGetRatingFromTitlePage(faUrl) {
   const html = await faFetch(faUrl);
-  if (!html) return { fa: null, faTitle: null };
+  if (!html) return { fa: null, faTitle: null, faType: null, faYear: null };
 
   const $ = cheerio.load(html);
 
@@ -256,6 +290,14 @@ async function faGetRatingFromTitlePage(faUrl) {
     cleanTitle($("h1").first().text()) ||
     cleanTitle($("title").first().text().replace(/\s*\|\s*FilmAffinity.*/i, "")) ||
     null;
+
+  // Año: intentamos sacar (YYYY) del <title>
+  const titleTxt = $("title").first().text() || "";
+  const mYear = stripDiacritics(titleTxt).match(/\b(19|20)\d{2}\b/);
+  const faYear = mYear ? Number(mYear[0]) : null;
+
+  // Tipo (movie/series) por heurística
+  const faType = detectFATypeFromPage($);
 
   let rating = null;
   const meta = $('meta[itemprop="ratingValue"]').attr("content");
@@ -273,12 +315,12 @@ async function faGetRatingFromTitlePage(faUrl) {
     }
   }
 
-  return { fa: rating, faTitle };
+  return { fa: rating, faTitle, faType, faYear };
 }
 
 const faCache = new Map();
 
-async function getFARating({ titleEs, titleOriginal, year }) {
+async function getFARating({ titleEs, titleOriginal, year, desiredType }) {
   const es = cleanTitle(titleEs);
   const orig = cleanTitle(titleOriginal);
 
@@ -289,36 +331,80 @@ async function getFARating({ titleEs, titleOriginal, year }) {
     orig,
   ].filter(Boolean);
 
+  const minSim = 0.45;
+
   for (const q of queries) {
-    if (faCache.has(q)) return faCache.get(q);
+    const cacheKey = `${q}::${desiredType || "any"}`;
+    if (faCache.has(cacheKey)) return faCache.get(cacheKey);
 
     await sleep(250);
-    const faUrl = await faFindTitleUrl(q);
-    if (!faUrl) {
-      const res = { fa: null, faUrl: null, faTitle: null };
-      faCache.set(q, res);
+
+    const faUrls = await faFindTitleUrls(q, 8);
+    if (!faUrls.length) {
+      const res = { fa: null, faUrl: null, faTitle: null, faType: null };
+      faCache.set(cacheKey, res);
       continue;
     }
 
-    await sleep(250);
-    const { fa, faTitle } = await faGetRatingFromTitlePage(faUrl);
+    // Evaluamos varios candidatos
+    let best = null;
+    let bestScore = -Infinity;
 
-    const res = {
-      fa: typeof fa === "number" ? fa : null,
-      faUrl,
-      faTitle: faTitle || null,
-    };
+    for (const faUrl of faUrls) {
+      await sleep(200);
+      const cand = await faGetRatingFromTitlePage(faUrl);
 
-    faCache.set(q, res);
+      // Regla dura: si detectamos tipo y NO coincide, descartamos
+      if (desiredType && cand.faType && cand.faType !== desiredType) continue;
+
+      // Similaridad de título
+      const sim = tokenSimilarity(es || orig || q, cand.faTitle || "");
+      if (sim < minSim) continue;
+
+      // Score
+      let score = sim * 100;
+
+      // Bonus por título normalizado exacto
+      if (normalizeTitle(es || "") && normalizeTitle(es || "") === normalizeTitle(cand.faTitle || "")) score += 25;
+
+      // Bonus por año cercano si lo tenemos
+      const yItem = Number(year);
+      const yFA = Number(cand.faYear);
+      if (Number.isFinite(yItem) && Number.isFinite(yFA)) {
+        const diff = Math.abs(yItem - yFA);
+        score += diff === 0 ? 18 : diff === 1 ? 10 : 0;
+      }
+
+      // Bonus por tener rating
+      if (typeof cand.fa === "number") score += 3;
+
+      if (score > bestScore) {
+        bestScore = score;
+        best = { ...cand, faUrl };
+      }
+    }
+
+    const res = best
+      ? { fa: typeof best.fa === "number" ? best.fa : null, faUrl: best.faUrl, faTitle: best.faTitle || null, faType: best.faType || null }
+      : { fa: null, faUrl: null, faTitle: null, faType: null };
+
+    faCache.set(cacheKey, res);
 
     if (res.fa != null || res.faTitle != null) return res;
   }
 
-  return { fa: null, faUrl: null, faTitle: null };
+  return { fa: null, faUrl: null, faTitle: null, faType: null };
 }
 
 // ---------------- scoring ----------------
-const WEIGHTS = { fa: 0.25, imdb: 0.25, rtCrit: 0.125, rtAud: 0.125, mcCrit: 0.125, mcUser: 0.125 };
+const WEIGHTS = {
+  fa: 0.25,
+  imdb: 0.25,
+  rtCrit: 0.125,
+  rtAud: 0.125,
+  mcCrit: 0.125,
+  mcUser: 0.125,
+};
 const to10 = (x100) => (typeof x100 === "number" ? x100 / 10 : null);
 
 function computeFinal(x) {
@@ -395,9 +481,12 @@ const buildMoviesES = async () => {
       titleEs: es.titleEs || m.title,
       titleOriginal: es.titleOriginal,
       year,
+      desiredType: "movie",
     });
 
     const item = {
+      type: "movie",
+
       title: faTitle || (es.titleEs || m.title),
       titleTmdbEs: es.titleEs || m.title,
       faTitle: faTitle || null,
@@ -405,6 +494,9 @@ const buildMoviesES = async () => {
       imdbUrl: imdbId ? `https://www.imdb.com/title/${imdbId}/` : null,
 
       releaseES: es.releaseES || null,
+      // alias para el front (más claro)
+      releaseDateES: es.releaseES || null,
+
       platforms: es.platforms || [],
       inCinemasES: !!es.inCinemasES,
       where: whereString(es),
@@ -462,6 +554,10 @@ const buildSeriesES = async () => {
     const hasESPlatforms = Array.isArray(es.platforms) && es.platforms.length > 0;
     if (!hasESPlatforms) continue;
 
+    // ✅ Regla: SOLO series estrenadas en España en las ÚLTIMAS 2 SEMANAS
+    // Si por lo que sea no hay releaseES, se descarta (no es auditable)
+    if (!isInLastDays(es.releaseES, 14, now)) continue;
+
     const ext = await tmdb(`tv/${s.id}/external_ids`);
     const imdbId = ext.imdb_id;
     const imdb = await omdbByImdbId(imdbId);
@@ -471,9 +567,12 @@ const buildSeriesES = async () => {
       titleEs: es.titleEs || s.name,
       titleOriginal: es.titleOriginal,
       year,
+      desiredType: "series",
     });
 
     const item = {
+      type: "series",
+
       title: faTitle || (es.titleEs || s.name),
       titleTmdbEs: es.titleEs || s.name,
       faTitle: faTitle || null,
@@ -481,6 +580,9 @@ const buildSeriesES = async () => {
       imdbUrl: imdbId ? `https://www.imdb.com/title/${imdbId}/` : null,
 
       releaseES: es.releaseES || null,
+      // alias para el front
+      releaseDateES: es.releaseES || null,
+
       platforms: es.platforms || [],
       inCinemasES: false,
       where: whereString({ platforms: es.platforms, inCinemasES: false }),
